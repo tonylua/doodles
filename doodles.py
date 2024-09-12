@@ -12,6 +12,8 @@ arg_parser.add_argument('--topic', type=str, help='topic of doodle')
 arg_parser.add_argument('--proxy', type=str, help='proxy address', default=None) 
 arg_parser.add_argument('--dir', type=str, help='output dir', default='./images/') 
 arg_parser.add_argument('--timeout', type=int, help='timeout in milliseconds', default=90000) 
+arg_parser.add_argument('--nextpage_timeout', type=int, help='timeout in milliseconds', default=30000) 
+arg_parser.add_argument('--open', type=int, help='open browser', default=0) 
 args = arg_parser.parse_args()
 
 if not args.topic:
@@ -26,21 +28,21 @@ topic_tags= args.topic
 def download_image(url, filename):
     if os.path.exists(filename): 
         print(f"skip already exists image: {filename}")
-        return None, None
+        return None
     response = requests.get(url=url, proxies=proxies)
     if response.status_code == 200:
         with open(filename, 'wb') as f:
             f.write(response.content)
         print(f"Image downloaded: {filename}")
-        return None, None
+        return None
     else:
         print(f"Failed to download image: {url}")
-        return url, filename
+        return { 'src': url, 'name': name }
         
 
 def run(playwright):
     # browser = playwright.chromium.launch(headless=False)
-    browser = playwright.chromium.launch(proxy={"server": proxies['http']})
+    browser = playwright.chromium.launch(proxy={"server": proxies['http']}, headless=not bool(args.open))
     context = browser.new_context()
     page = context.new_page()
 
@@ -78,25 +80,26 @@ def run(playwright):
             if show_more_button and show_more_button.is_visible():
                 show_more_button.click()
 
-                page.wait_for_timeout(10000)  
+                page.wait_for_timeout(args.nextpage_timeout or 30000)  
 
                 images_after = len(page.query_selector_all('.doodle-card-img>img[src$=".gif"]'))
+                pbar.set_description(f"after next page, {images_after} images scanned")
                 if images_after > images_before:
                     images_before = images_after 
-                    pbar.set_description(f"{images_after} images scanned")
                 else:
                     print("没有新的图片加载，停止循环。")
                     break
             else:
                 break
 
-        pbar.set_description("all images scanned")
-        pbar.update(5) # 20 
-
         images_info = []
         fail_info = []
         images = page.query_selector_all('.doodle-card-img>img[src$=".gif"]')
         indexes = range(len(images))
+        
+        pbar.set_description(f"all images scanned, {len(images)} total")
+        pbar.update(5) # 20 
+
         for idx, img in zip(indexes, images):
             src = re.subn(r'^\/\/', 'http://', img.get_attribute('src'))[0]
             alt = str(idx) + '-' + (img.get_attribute('alt') or 'doodle')
@@ -112,12 +115,9 @@ def run(playwright):
         with open(f"{save_folder}images_info.json", 'w', encoding='utf-8') as json_file:
             json.dump(images_info, json_file, ensure_ascii=False, indent=4)
         for image in images_info:
-            fail_url, fail_name = download_image(image['src'], f'{save_folder}{image["name"]}.gif') 
-            if fail_url:
-                fail_info.append({
-                    'src': fail_url,
-                    'name': fail_name
-                })
+            fail = download_image(image['src'], f'{save_folder}{image["name"]}.gif') 
+            if fail:
+                fail_info.append(fail)
             pbar.set_description("images downloading...")
             pbar.update(math.floor(75/len(images_info)))
         with open(f"{save_folder}fail_info.json", 'w', encoding='utf-8') as json_file:
