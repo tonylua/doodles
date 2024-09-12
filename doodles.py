@@ -6,9 +6,13 @@ import requests
 import argparse
 from playwright.sync_api import sync_playwright
 from tqdm import tqdm
+from datetime import datetime
+
+now = datetime.now()
+formatted_now = now.strftime('%Y%m%d%H%M%S')
 
 arg_parser = argparse.ArgumentParser()
-arg_parser.add_argument('--topic', type=str, help='topic of doodle')
+arg_parser.add_argument('--query', type=str, help='a query string of doodle')
 arg_parser.add_argument('--proxy', type=str, help='proxy address', default=None) 
 arg_parser.add_argument('--dir', type=str, help='output dir', default='./images/') 
 arg_parser.add_argument('--timeout', type=int, help='timeout in milliseconds', default=90000) 
@@ -16,14 +20,14 @@ arg_parser.add_argument('--nextpage_timeout', type=int, help='timeout in millise
 arg_parser.add_argument('--open', type=int, help='open browser', default=0) 
 args = arg_parser.parse_args()
 
-if not args.topic:
-    print("Please provide a doodle name.")
+if not args.query:
+    print("Please provide a query like `topic_tags=foobar`!")
     exit(1)
 
 proxies = {"http": args.proxy, "https": args.proxy} if args.proxy else None
 timeout = args.timeout or 90000
-save_folder = args.dir or "./images/"
-topic_tags= args.topic 
+save_folder = f"{args.dir}{formatted_now}/" if args.dir else f"./images/{formatted_now}/"
+os.makedirs(save_folder, exist_ok=True)
 
 def download_image(url, filename):
     if os.path.exists(filename): 
@@ -47,7 +51,7 @@ def run(playwright):
     page = context.new_page()
 
     with tqdm(total=100) as pbar:
-        page.goto(f"https://doodles.google/search/?topic_tags={topic_tags}", timeout=timeout)
+        page.goto(f"https://doodles.google/search/?{args.query}", timeout=timeout)
         pbar.set_description("page loaded")
         pbar.update(5) # 5
 
