@@ -4,12 +4,9 @@ import json
 import math
 import requests
 import argparse
-from playwright.sync_api import sync_playwright
 from tqdm import tqdm
 from datetime import datetime
-
-now = datetime.now()
-formatted_now = now.strftime('%Y%m%d%H%M%S')
+from playwright.sync_api import sync_playwright
 
 arg_parser = argparse.ArgumentParser()
 arg_parser.add_argument('--query', type=str, help='a query string of doodle')
@@ -18,6 +15,8 @@ arg_parser.add_argument('--dir', type=str, help='output dir', default='./images/
 arg_parser.add_argument('--timeout', type=int, help='timeout in milliseconds', default=90000) 
 arg_parser.add_argument('--nextpage_timeout', type=int, help='timeout in milliseconds', default=30000) 
 arg_parser.add_argument('--open', type=int, help='open browser', default=0) 
+arg_parser.add_argument('--only_gif', type=int, help='only gif', default=0) 
+arg_parser.add_argument('--limit', type=int, help='total limit', default=999) 
 args = arg_parser.parse_args()
 
 if not args.query:
@@ -25,11 +24,13 @@ if not args.query:
     exit(1)
 
 proxies = {"http": args.proxy, "https": args.proxy} if args.proxy else None
-timeout = args.timeout or 90000
-save_folder = f"{args.dir}{formatted_now}/" if args.dir else f"./images/{formatted_now}/"
-os.makedirs(save_folder, exist_ok=True)
+formatted_now = datetime.now().strftime('%Y%m%d%H%M%S')
+save_folder = args.dir or f"./images/{formatted_now}/"
+css_selector = '.doodle-card-img>img' + ('[src$=".gif"]' if args.only_gif else '')
+total_count = 0
 
 def download_image(url, filename):
+    os.makedirs(save_folder, exist_ok=True)
     if os.path.exists(filename): 
         print(f"skip already exists image: {filename}")
         return None
@@ -41,17 +42,61 @@ def download_image(url, filename):
         return None
     else:
         print(f"Failed to download image: {url}")
-        return { 'src': url, 'name': name }
-        
+        return { 'src': url, 'name': name, 'reason': response.status_code + ' ' + response.reason }
+
+def get_file_ext(url):
+    match = re.search(r'\.([^./]+)$', url)
+    return match.group(1) if match else None 
+
+def sanitize_filename(filename):
+    invalid_chars = r'<>:"/\\|?*'
+    return re.sub(rf'[{re.escape(invalid_chars)}]', '_', filename)
+
+# def intercept_request(route, request):
+#     if "/v1/doodles" in request.url:
+#         url = re.subn(r'limit\=\d+', f'limit={args.limit}', request.url)[0]
+#         url = re.subn(r'page\=\d+', 'page=1', url)[0]
+#         # print(f"Intercepted request: {url}")
+#         route.continue_(url=url)
+#     else:
+#         route.continue_()
+
+def intercept_response(response):
+    if "/v1/doodles" in response.url:
+        try:
+            global total_count
+            count = int(response.json()['totalItems'])
+            if count > total_count:
+                total_count = count 
+                print(total_count, ' doodles total!')
+        except (ValueError, TypeError, KeyError) as e:
+            print('Error:', e)
+    return response
+def intercept_response(response):
+    global total_count 
+    if "/v1/doodles" in response.url:
+        try:
+            data = response.json()  
+            if data is None:
+                print("Response does not contain valid JSON data.")
+            else:
+                count = int(data.get('totalItems', 0)) 
+                if count > total_count:
+                    total_count = count 
+                    print(total_count, ' doodles total!')
+        except (ValueError, TypeError, KeyError) as e:
+            print('Error:', e)
+    return response
 
 def run(playwright):
-    # browser = playwright.chromium.launch(headless=False)
     browser = playwright.chromium.launch(proxy={"server": proxies['http']}, headless=not bool(args.open))
     context = browser.new_context()
     page = context.new_page()
+    # page.route("**/*", intercept_request)
+    page.on("response", intercept_response)
+    page.goto(f"https://doodles.google/search/?{args.query}", timeout=args.timeout)
 
     with tqdm(total=100) as pbar:
-        page.goto(f"https://doodles.google/search/?{args.query}", timeout=timeout)
         pbar.set_description("page loaded")
         pbar.update(5) # 5
 
@@ -67,41 +112,55 @@ def run(playwright):
         pbar.update(5) # 10 
     
         try:
-            page.wait_for_selector('.doodle-card-img>img[src$=".gif"]', timeout=timeout)  
-            pbar.set_description("first image found")
+            page.wait_for_selector(css_selector, timeout=args.timeout)  
+            pbar.set_description("first image found in page")
             pbar.update(5) # 15
         except playwright._impl._api_types.TimeoutError:
-            print(f"未能在 {timeout/1000} 秒内找到匹配的元素。")
+            print(f"未能在 {args.timeout/1000} 秒内找到匹配的元素。")
             browser.close()
             return
 
+        pages_count = 1
         images_before = 0
         while True:
             page.evaluate("window.scrollTo(0, document.body.scrollHeight);")
             page.wait_for_timeout(3000)  
 
             show_more_button = page.query_selector('text=Show More')
-            if show_more_button and show_more_button.is_visible():
+            if show_more_button and show_more_button.is_visible() and args.limit > images_before:
                 show_more_button.click()
 
                 page.wait_for_timeout(args.nextpage_timeout or 30000)  
 
-                images_after = len(page.query_selector_all('.doodle-card-img>img[src$=".gif"]'))
+                images_after = len(page.query_selector_all(css_selector))
                 pbar.set_description(f"after next page, {images_after} images scanned")
                 if images_after > images_before:
                     images_before = images_after 
-                else:
-                    print("没有新的图片加载，停止循环。")
-                    break
+                    pages_count += 1
             else:
                 break
 
+        if not total_count:
+            raise Exception("total count not in response!")
+            browser.close()
+            return
+        
+        desired_total = min(args.limit, total_count)
+        if images_before < desired_total:
+            exception_msg = f"total {total_count}"
+            if args.limit < total_count:
+                exception_msg += f"(limit {args.limit})"
+            exception_msg += f", but only {images_before} images found in page, please retry!"
+            raise Exception(exception_msg)
+            browser.close()
+            return
+
         images_info = []
         fail_info = []
-        images = page.query_selector_all('.doodle-card-img>img[src$=".gif"]')
+        images = page.query_selector_all(css_selector)[0:desired_total]
         indexes = range(len(images))
         
-        pbar.set_description(f"all images scanned, {len(images)} total")
+        pbar.set_description(f"all {len(images)} images scanned from {pages_count} pages")
         pbar.update(5) # 20 
 
         for idx, img in zip(indexes, images):
@@ -109,7 +168,7 @@ def run(playwright):
             alt = str(idx) + '-' + (img.get_attribute('alt') or 'doodle')
             images_info.append({
                 'src': src,
-                'name': alt
+                'name': sanitize_filename(alt)
             })
 
         pbar.set_description("images info saved")
@@ -119,7 +178,11 @@ def run(playwright):
         with open(f"{save_folder}images_info.json", 'w', encoding='utf-8') as json_file:
             json.dump(images_info, json_file, ensure_ascii=False, indent=4)
         for image in images_info:
-            fail = download_image(image['src'], f'{save_folder}{image["name"]}.gif') 
+            file_ext = get_file_ext(image['src']) or 'jpg'
+            # if (file_ext):
+            fail = download_image(image['src'], f'{save_folder}{image["name"]}.{file_ext}') 
+            # else:
+            #     fail = { 'src': image['src'], 'name': image['name'], 'reason': 'unknown file extension' }
             if fail:
                 fail_info.append(fail)
             pbar.set_description("images downloading...")
