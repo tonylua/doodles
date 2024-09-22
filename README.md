@@ -25,3 +25,4 @@ arg|type|desc|default|required
 `--only_gif`|int|only gif|0|×
 `--limit`|int|total limit|999|×
 `--page_start`|int|start page|None|×
+`--info_file`|istr|info json file, skip browser|None|×
