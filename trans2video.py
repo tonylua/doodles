@@ -43,6 +43,7 @@ def merge_videos(video_files, output_video_name):
             f.write(f"file '{video_file}'\n")
     cmd = f"ffmpeg -f concat -i f'{TMP_FOLDER}merge.txt' -c copy {output_video_name}"
     subprocess.run(cmd, shell=True)
+    shutil.rmtree(TMP_FOLDER)
 
 def main(directory, output_video_name):
     image_files = glob.glob(os.path.join(directory, "*"))
@@ -55,8 +56,6 @@ def main(directory, output_video_name):
             temp_video_files.append(video_file)
     
     merge_videos(temp_video_files, output_video_name)
-    
-    shutil.rmtree(TMP_FOLDER)
 
 if __name__ == "__main__":
     import sys
