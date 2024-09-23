@@ -2,11 +2,10 @@ import os
 import re
 import json
 import math
-import requests
 from tqdm import tqdm
-from datetime import datetime
 from playwright.sync_api import sync_playwright
 from utils.shared import args, proxies, save_folder, page_size, total_count 
+from utils.file import sanitize_filename, get_file_ext, download_image 
 from utils.interceptor import intercept_request, intercept_response
 
 if not args.query:
