@@ -2,9 +2,23 @@ import os
 import re
 import json
 import requests
-from .shared import proxies, save_folder
+from PIL import Image
+
+def get_gif_duration(path):
+    img_obj = Image.open(path)
+    img_obj.seek(0)  # move to the start of the gif, frame 0
+    tot_duration = 0
+    while True:
+        try:
+            frame_duration = img_obj.info['duration']  # returns current frame duration in milli sec.
+            tot_duration += frame_duration
+            img_obj.seek(img_obj.tell() + 1)  # image.tell() = current frame
+        except EOFError:
+            return tot_duration
 
 def download_image(url, filename):
+    from .shared import proxies, save_folder
+
     if os.path.exists(filename): 
         print(f"skip already exists image: {filename}")
         return None

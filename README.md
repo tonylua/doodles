@@ -4,6 +4,7 @@
 pip install pytest-playwright
 python -m playwright install
 pip install tqdm
+pip install pillow
 ```
 
 ## run
