@@ -10,10 +10,11 @@ from utils.file import get_gif_duration
 TMP_FOLDER = "./tmp/"
 FONT_FILE = "./sounso.ttf"
 MIN_DURATION = 3 
+RESOLUTION = 1280, 720
 
 def convert_image_to_video(image_path, output_video_name, is_gif):
     base_name = os.path.splitext(os.path.basename(image_path))[0]
-    base_name = re.sub(r"'", " ", base_name)
+    base_name = re.sub(r"'", " ", base_name) # fix concat issue
     video_name = base_name.replace(TMP_FOLDER, "") + '.mp4'
 
     os.makedirs(TMP_FOLDER, exist_ok=True)
@@ -22,12 +23,13 @@ def convert_image_to_video(image_path, output_video_name, is_gif):
     if os.path.exists(temp_video_name): 
         print(f"skip already exists file: {temp_video_name}")
         return video_name
-    
+
+    w, h = RESOLUTION 
     common_cmd_args = (
         f"-loglevel panic "
         f"-vf \""
-        f"scale='if(gt(iw,1280),1280/iw,0)':'if(gt(ih,720),720/ih,0)':force_original_aspect_ratio=decrease,"
-        f"pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=white,"
+        f"scale='if(gt(iw,{w}),{w}/iw,0)':'if(gt(ih,{h}),{h}/ih,0)':force_original_aspect_ratio=decrease,"
+        f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:color=white,"
         f"drawtext=fontfile={FONT_FILE}:text='{base_name}':fontcolor=#cccccc:fontsize=28:"
         f"shadowx=2:shadowy=2:shadowcolor=black:"
         f"x=(w-text_w)/2:y=h-(text_h*1.5)\""
