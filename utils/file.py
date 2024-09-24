@@ -13,7 +13,7 @@ def get_gif_duration(path):
             frame_duration = img_obj.info['duration']  # returns current frame duration in milli sec.
             tot_duration += frame_duration
             img_obj.seek(img_obj.tell() + 1)  # image.tell() = current frame
-        except EOFError:
+        except (EOFError, KeyError):
             return tot_duration
 
 def download_image(url, filename):
