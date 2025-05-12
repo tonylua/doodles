@@ -1,12 +1,16 @@
-## install
+## download doodles
+
+### install
 
 ```
-pip install playwright playwright -U
+# pip install tqdm
+# pip install playwright playwright -U
+
+uv sync
 python -m playwright install
-pip install tqdm
 ```
 
-## run
+### run
 
 ```
 python doodles.py [ARGUMENTS]
@@ -26,3 +30,16 @@ python doodles.py [ARGUMENTS]
 | `--limit`            | int  | total limit                                                               | 999                    | ×        |
 | `--page_start`       | int  | start page                                                                | None                   | ×        |
 | `--info_file`        | istr | info json file, skip browser                                              | None                   | ×        |
+
+## doodles to video
+
+### install
+
+- win: download ffmpeg and set system PATH
+- uv sync
+
+### run
+
+```
+python .\trans2video.py .\images\20250511160708\ "LaborDay.mp4"
+```

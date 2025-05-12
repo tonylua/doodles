@@ -4,6 +4,7 @@ import glob
 import subprocess
 import shutil
 import math
+import platform
 from tqdm import tqdm
 from utils.file import get_gif_duration 
 
@@ -18,7 +19,7 @@ def convert_image_to_video(image_path, output_video_name, is_gif):
     video_name = base_name.replace(TMP_FOLDER, "") + '.mp4'
 
     os.makedirs(TMP_FOLDER, exist_ok=True)
-    temp_video_name = f"{TMP_FOLDER}{video_name}"
+    temp_video_name = os.path.abspath(f"{TMP_FOLDER}{video_name}")
     
     if os.path.exists(temp_video_name): 
         print(f"skip already exists file: {temp_video_name}")
@@ -39,7 +40,7 @@ def convert_image_to_video(image_path, output_video_name, is_gif):
         duration = get_gif_duration(image_path) or 0.016
         if duration < MIN_DURATION:
             loop_times = math.ceil(MIN_DURATION / duration)
-            tmp_loop_gif = f"{TMP_FOLDER}{base_name}_loop.gif"
+            tmp_loop_gif = os.path.abspath(f"{TMP_FOLDER}{base_name}_loop.gif")
             cmd = (
                 f"ffmpeg "
                 f"-loglevel panic "
@@ -56,24 +57,34 @@ def convert_image_to_video(image_path, output_video_name, is_gif):
             f"-loop 1 -c:v libx264 -c:a copy \"{temp_video_name}\""
         )
     else:
+        # cmd = (
+        #     f"ffmpeg -loop 1 -i \"{image_path}\" "
+        #     f"-c:v libx264 -t {MIN_DURATION} "
+        #     f"-r 30 -pix_fmt yuv420p "
+        #     f"{common_cmd_args} "
+        #     f"-shortest \"{temp_video_name}\""
+        # )
         cmd = (
             f"ffmpeg -loop 1 -i \"{image_path}\" "
-            f"-c:v libx264 -t {MIN_DURATION} "
-            f"-r 30 -pix_fmt yuv420p "
-            f"{common_cmd_args} "
-            f"-shortest \"{temp_video_name}\""
+            f"-c:v mpeg4 -q:v 2 "         # 使用 mpeg4 编码器，质量因子 2（范围 1-31，值越小质量越高）
+            f"-t {MIN_DURATION} -r 30 "
+            f"-pix_fmt yuv420p {common_cmd_args} "
+            f"-shortest \"{temp_video_name}\" "
         )
+    # print(cmd)
     subprocess.run(cmd, shell=True)
-    return video_name
+    return temp_video_name
 
 def merge_videos(video_files, output_video_name):
-    with open(f"{TMP_FOLDER}merge.txt", "w") as f:
+    mergePath = os.path.abspath(f"{TMP_FOLDER}merge.txt") 
+    with open(mergePath, "w") as f:
         for video_file in video_files:
             video_file = re.sub(r"'", "\\'", video_file)
             f.write(f"file '{video_file}'\n")
     try:
-        cmd = f"ffmpeg -f concat -safe 0 -i {TMP_FOLDER}merge.txt -c copy {output_video_name}"
+        cmd = f"ffmpeg -f concat -safe 0 -i {mergePath} -c copy {output_video_name}"
     except Exception as e:
+        print('mergePath exception', mergePath)
         raise e 
     subprocess.run(cmd, shell=True)
 
@@ -110,4 +121,6 @@ if __name__ == "__main__":
     
     directory = sys.argv[1]
     output_video_name = sys.argv[2]
+    if platform.system() == "Windows":
+        os.environ["FONTCONFIG_PATH"] = "fonts.conf"
     main(directory, output_video_name)

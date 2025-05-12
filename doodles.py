@@ -4,9 +4,9 @@ import json
 import math
 from tqdm import tqdm
 from playwright.sync_api import sync_playwright
-from utils.shared import args, proxies, save_folder, page_size, total_count 
+from utils.shared import args, proxies, save_folder, page_size 
 from utils.file import sanitize_filename, get_file_ext, download_image 
-from utils.interceptor import intercept_request, intercept_response
+from utils.interceptor import intercept_request, intercept_response, TotalCounter
 
 if not args.query:
     print("Please provide a query like `topic_tags=foobar`!")
@@ -78,13 +78,14 @@ def run(playwright):
                 else:
                     break
 
-            if not total_count:
+            print(1111, TotalCounter.total_count)
+            if not TotalCounter.total_count:
                 raise Exception("total count not in response!")
             
-            desired_total = min(args.limit, total_count)
+            desired_total = min(args.limit, TotalCounter.total_count)
             if images_before < desired_total:
-                exception_msg = f"total {total_count}"
-                if args.limit < total_count:
+                exception_msg = f"total {TotalCounter.total_count}"
+                if args.limit < TotalCounter.total_count:
                     exception_msg += f"(limit {args.limit})"
                 exception_msg += f", but only {images_before} images found in page, please retry next time!"
                 # raise Exception(exception_msg)

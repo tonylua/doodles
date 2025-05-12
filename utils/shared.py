@@ -19,4 +19,3 @@ proxies = {"http": args.proxy, "https": args.proxy} if args.proxy else None
 formatted_now = datetime.now().strftime('%Y%m%d%H%M%S')
 save_folder = args.dir or f"./images/{formatted_now}/"
 page_size = 16
-total_count = 0
