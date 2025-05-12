@@ -37,6 +37,7 @@ python doodles.py [ARGUMENTS]
 
 - win: download ffmpeg and set system PATH
 - uv sync
+- if on windows, install the font file first
 
 ### run
 
