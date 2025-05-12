@@ -1,4 +1,4 @@
-## download doodles
+## 1. download doodles
 
 ### install
 
@@ -16,6 +16,12 @@ python -m playwright install
 python doodles.py [ARGUMENTS]
 ```
 
+#### example
+
+```
+python doodles.py --query="title_like=Mother's Day" --proxy=http://127.0.0.1:10810 --timeout=180000
+```
+
 ### arguments
 
 | arg                  | type | desc                                                                      | default                | required |
@@ -31,7 +37,9 @@ python doodles.py [ARGUMENTS]
 | `--page_start`       | int  | start page                                                                | None                   | ×        |
 | `--info_file`        | istr | info json file, skip browser                                              | None                   | ×        |
 
-## doodles to video
+---
+
+## 2. doodles to video
 
 ### install
 
@@ -40,6 +48,12 @@ python doodles.py [ARGUMENTS]
 - if on windows, install the font file first
 
 ### run
+
+```
+python .\trans2video.py [images_dir] [output_video_name]
+```
+
+#### example
 
 ```
 python .\trans2video.py .\images\20250511160708\ "LaborDay.mp4"
