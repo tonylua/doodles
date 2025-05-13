@@ -50,11 +50,17 @@ def convert_image_to_video(image_path, output_video_name, is_gif):
             )
             subprocess.run(cmd, shell=True)
             image_path = tmp_loop_gif
+        # cmd = (
+        #     f"ffmpeg -i \"{image_path}\" "
+        #     f"-ignore_loop 0 -pix_fmt yuv420p "
+        #     f"{common_cmd_args} "
+        #     f"-loop 1 -c:v libx264 -c:a copy \"{temp_video_name}\""
+        # )
         cmd = (
             f"ffmpeg -i \"{image_path}\" "
             f"-ignore_loop 0 -pix_fmt yuv420p "
             f"{common_cmd_args} "
-            f"-loop 1 -c:v libx264 -c:a copy \"{temp_video_name}\""
+            f"-loop 1 -c:v mpeg4 -q:v 2 -c:a copy \"{temp_video_name}\""  # Changed to mpeg4
         )
     else:
         # cmd = (
@@ -109,9 +115,12 @@ def main(directory, output_video_name):
         if image_file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')):
             is_gif = image_file.lower().endswith('.gif')
             video_file = convert_image_to_video(image_file, output_video_name, is_gif)
-            temp_video_files.append(video_file)
+            if os.path.exists(video_file):
+                temp_video_files.append(video_file)
+            else:
+                print('FAIL', video_file)
     merge_videos(temp_video_files, output_video_name)
-    shutil.rmtree(TMP_FOLDER)
+    # shutil.rmtree(TMP_FOLDER)
 
 if __name__ == "__main__":
     import sys
