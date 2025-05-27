@@ -13,6 +13,7 @@ arg_parser.add_argument('--only_gif', type=int, help='only gif', default=0)
 arg_parser.add_argument('--limit', type=int, help='total limit', default=999) 
 arg_parser.add_argument('--page_start', type=int, help='start page') 
 arg_parser.add_argument('--info_file', type=str, help='direct download from json file, skip browser') 
+arg_parser.add_argument('--edge', type=int, help='use MS Edge browser', default=0) 
 args = arg_parser.parse_args()
 
 proxies = {"http": args.proxy, "https": args.proxy} if args.proxy else None

@@ -35,7 +35,8 @@ python doodles.py --query="title_like=Mother's Day" --proxy=http://127.0.0.1:108
 | `--only_gif`         | int  | only gif                                                                  | 0                      | ×        |
 | `--limit`            | int  | total limit                                                               | 999                    | ×        |
 | `--page_start`       | int  | start page                                                                | None                   | ×        |
-| `--info_file`        | istr | info json file, skip browser                                              | None                   | ×        |
+| `--info_file`        | str  | info json file, skip browser                                              | None                   | ×        |
+| `--edge`             | int  | use MS Edge browser                                                       | 0                      | ×        |
 
 ---
 

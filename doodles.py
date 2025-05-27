@@ -25,10 +25,14 @@ def run(playwright):
                 images_info = json.load(json_file)
             pbar.update(25)
         else:
-            browser = playwright.chromium.launch(
-                proxy={"server": proxies['http']} if proxies else None, 
-                headless=not bool(args.open)
-            )
+            launch_options = {
+                "proxy": {"server": proxies['http']} if proxies else None,
+                "headless": not bool(args.open)
+            }
+            if args.edge:
+                launch_options["channel"] = 'msedge'
+            browser = playwright.chromium.launch(**launch_options)
+
             context = browser.new_context()
             page = context.new_page()
             page.route("**/*", intercept_request)
