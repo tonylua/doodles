@@ -14,6 +14,7 @@ arg_parser.add_argument('--limit', type=int, help='total limit', default=999)
 arg_parser.add_argument('--page_start', type=int, help='start page') 
 arg_parser.add_argument('--info_file', type=str, help='direct download from json file, skip browser') 
 arg_parser.add_argument('--edge', type=int, help='use MS Edge browser', default=0) 
+arg_parser.add_argument('--browser_path', type=str, help='browser executable path') 
 args = arg_parser.parse_args()
 
 proxies = {"http": args.proxy, "https": args.proxy} if args.proxy else None
