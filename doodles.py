@@ -47,22 +47,23 @@ def run(playwright):
             else:
                 launch_options = {
                     "proxy": {"server": proxies['http']} if proxies else None,
-                    "headless": not bool(args.open),
-                    "user_data_dir": temp_dir,
-                    "bypass_csp": True,
-                    "ignore_default_args": ['--enable-automation']
+                    "headless": not bool(args.open)
                 }
                 if args.edge:
                     launch_options["channel"] = 'msedge'
                 if args.browser_path:
                     launch_options["executable_path"] = args.browser_path
-                # browser = playwright.chromium.launch(**launch_options)
-                # context = browser.new_context()
-                # page = context.new_page()
-    
-                # 反反爬 非匿名模式 
-                browser = playwright.chromium.launch_persistent_context(**launch_options)
-                page = browser.new_page()
+
+                if args.anonymous:
+                    browser = playwright.chromium.launch(**launch_options)
+                    context = browser.new_context()
+                    page = context.new_page()
+                else: 
+                    launch_options["user_data_dir"] = temp_dir
+                    launch_options["bypass_csp"] = True
+                    launch_options["ignore_default_args"] = ['--enable-automation']
+                    browser = playwright.chromium.launch_persistent_context(**launch_options)
+                    page = browser.new_page()
     
                 # 反反爬 prevent window.navigator.webdriver
                 with open('./utils/stealth.min.js', 'r') as f:
@@ -166,9 +167,6 @@ def run(playwright):
     
             print(f"{len(fail_info)} failed, {len(images_info)} total, download finished!")
             pbar.close()
-    except playwright._impl._errors.TargetClosedError:
-        cleanup_user_data()
-        print(e)
     except Exception as e:
         cleanup_user_data()
         print(e)
