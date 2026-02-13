@@ -5,16 +5,29 @@ import requests
 from PIL import Image
 
 def get_gif_duration(path):
-    img_obj = Image.open(path)
-    img_obj.seek(0)  # move to the start of the gif, frame 0
-    tot_duration = 0
-    while True:
-        try:
-            frame_duration = img_obj.info['duration']  # returns current frame duration in milli sec.
-            tot_duration += frame_duration
-            img_obj.seek(img_obj.tell() + 1)  # image.tell() = current frame
-        except (EOFError, KeyError):
-            return tot_duration
+    """Get GIF duration in seconds with fallback for corrupted files.
+    Max duration capped at 5 seconds to prevent freeze issues."""
+    try:
+        img_obj = Image.open(path)
+        img_obj.seek(0)  # move to the start of the gif, frame 0
+        tot_duration = 0
+        frame_count = 0
+        while True:
+            try:
+                frame_duration = img_obj.info.get('duration', 100)  # returns current frame duration in milli sec.
+                tot_duration += frame_duration
+                img_obj.seek(img_obj.tell() + 1)  # image.tell() = current frame
+                frame_count += 1
+            except (EOFError, KeyError):
+                break
+        
+        # Convert milliseconds to seconds
+        duration_seconds = tot_duration / 1000.0 if tot_duration > 0 else 3.0
+        # Cap at maximum 5 seconds to prevent freeze issues with GIFs
+        return min(duration_seconds, 5.0)
+    except Exception as e:
+        # Corrupted GIF or read error - return fallback duration
+        return 3.0
 
 def download_image(url, filename):
     from .shared import proxies, save_folder
