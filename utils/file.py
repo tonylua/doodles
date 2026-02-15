@@ -29,6 +29,22 @@ def get_gif_duration(path):
         # Corrupted GIF or read error - return fallback duration
         return 3.0
 
+def is_single_frame_gif(path):
+    """Check if a GIF is a single-frame (non-animated) GIF."""
+    try:
+        img_obj = Image.open(path)
+        img_obj.seek(0)
+        frame_count = 0
+        while True:
+            try:
+                frame_count += 1
+                img_obj.seek(img_obj.tell() + 1)
+            except (EOFError, KeyError):
+                break
+        return frame_count <= 1
+    except Exception as e:
+        return False
+
 def download_image(url, filename):
     from .shared import proxies, save_folder
 

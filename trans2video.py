@@ -6,7 +6,7 @@ import shutil
 import math
 import platform
 from tqdm import tqdm
-from utils.file import get_gif_duration
+from utils.file import get_gif_duration, is_single_frame_gif
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
@@ -101,9 +101,12 @@ def convert_image_to_video(image_path, output_video_name, is_gif):
     # Simplified filter: scale then pad (works reliably on Windows)
     scale_filter = f"scale={w}:{h},pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:color=white"
     
+    # Check if it's a single-frame GIF (treat as static image)
+    treat_as_static = not is_gif or (is_gif and is_single_frame_gif(image_path))
+    
     # For static images: create scaled+padded version with text
     image_to_convert = image_path
-    if not is_gif:
+    if treat_as_static:
         # Add text to static image (at final resolution)
         temp_image_with_text = os.path.abspath(f"{TMP_FOLDER}{safe_base_name}_text.jpg")
         add_text_to_image(image_path, base_name, temp_image_with_text)
