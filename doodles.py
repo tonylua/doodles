@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 from tqdm import tqdm
 from playwright.sync_api import sync_playwright
-from utils.shared import args, proxies, save_folder, page_size 
+from utils.shared import args, proxies, save_folder, page_size, get_default_browser 
 from utils.file import sanitize_filename, get_file_ext, download_image 
 from utils.interceptor import intercept_request, intercept_response, TotalCounter
 from cleanup_chrome_profiles import cleanup_chrome_profiles
@@ -87,6 +87,17 @@ def run(playwright):
                     images_info = json.load(json_file)
                 pbar.update(25)
             else:
+                # Determine which browser to use
+                use_edge = args.edge
+                browser_path = args.browser_path
+                
+                if not use_edge and args.default_browser:
+                    browser_type, browser_path = get_default_browser()
+                    if browser_path:
+                        print(f"使用系统默认浏览器: {browser_path}")
+                    else:
+                        print("未找到系统默认浏览器，将使用 Chromium")
+                
                 launch_options = {
                     "proxy": {"server": proxies['http']} if proxies else None,
                     "headless": not bool(args.open),
@@ -105,10 +116,10 @@ def run(playwright):
                         "--no-service-autorun",
                     ]
                 }
-                if args.edge:
+                if use_edge:
                     launch_options["channel"] = 'msedge'
-                if args.browser_path:
-                    launch_options["executable_path"] = args.browser_path
+                if browser_path:
+                    launch_options["executable_path"] = browser_path
 
                 if args.anonymous:
                     browser = playwright.chromium.launch(**launch_options)
@@ -168,12 +179,10 @@ def run(playwright):
                         value: 'Google Inc.',
                         enumerable: true
                     });
-                    
                     Object.defineProperty(navigator, 'platform', {
                         value: 'Win32',
                         enumerable: true
                     });
-                    
                     // 隐藏更多的自动化标志
                     if (window.chrome) {
                         Object.defineProperty(window.chrome, 'webstore', {

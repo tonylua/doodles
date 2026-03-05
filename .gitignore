@@ -4,3 +4,4 @@ __pycache__
 tmp
 .session.vim
 *.mp4
+debug*                    
