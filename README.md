@@ -35,10 +35,22 @@ python doodles.py --query="title_like=Mother's Day" --proxy=http://127.0.0.1:108
 | `--only_gif`         | int  | only gif                                                                  | 0                      | ×        |
 | `--limit`            | int  | total limit                                                               | 999                    | ×        |
 | `--page_start`       | int  | start page                                                                | None                   | ×        |
-| `--info_file`        | str  | info json file, skip browser                                              | None                   | ×        |
+| `--info_file`        | str  | info json file(fail_info.json eg.), skip browser                          | None                   | ×        |
 | `--edge`             | int  | use MS Edge browser                                                       | 0                      | ×        |
 | `--browser_path`     | str  | browser executable path                                                   |                        | ×        |
 | `--anonymous`        | int  | use anonymous mode                                                        | 0                      | ×        |
+| `--default-browser`  | int  | use system default browser                                                | 0                      | ×        |
+| `--dedupe`           | str  | deduplicate images in specified directory by MD5 hash (standalone mode)   | None                   | ×        |
+
+### deduplicate images
+
+Remove duplicate images from a directory based on MD5 hash:
+
+```bash
+python doodles.py --dedupe="./images/20260310175703"
+```
+
+This will scan all images in the specified directory, calculate MD5 hashes, and delete duplicate files (keeping the first occurrence).
 
 ---
 

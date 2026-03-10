@@ -6,13 +6,76 @@ import tempfile
 import shutil
 import random
 import time
+import hashlib
 from pathlib import Path
 from tqdm import tqdm
 from playwright.sync_api import sync_playwright
-from utils.shared import args, proxies, save_folder, page_size, get_default_browser 
-from utils.file import sanitize_filename, get_file_ext, download_image 
+from utils.shared import args, proxies, save_folder, page_size, get_default_browser
+from utils.file import sanitize_filename, get_file_ext, download_image
 from utils.interceptor import intercept_request, intercept_response, TotalCounter
 from cleanup_chrome_profiles import cleanup_chrome_profiles
+
+# 如果指定了 --dedupe 参数，只执行去重操作
+if args.dedupe:
+    def deduplicate_images(folder_path):
+        """按 MD5 去重图片文件"""
+        if not os.path.exists(folder_path):
+            print(f"错误：目录不存在: {folder_path}")
+            exit(1)
+
+        print(f"开始检查重复图片: {os.path.abspath(folder_path)}")
+        md5_dict = {}
+        duplicates = []
+        image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'}
+
+        # 遍历目录中的所有图片文件
+        for filename in os.listdir(folder_path):
+            file_path = os.path.join(folder_path, filename)
+            if not os.path.isfile(file_path):
+                continue
+
+            # 检查是否是图片文件
+            ext = os.path.splitext(filename)[1].lower()
+            if ext not in image_extensions:
+                continue
+
+            # 计算 MD5
+            try:
+                with open(file_path, 'rb') as f:
+                    file_hash = hashlib.md5(f.read()).hexdigest()
+
+                if file_hash in md5_dict:
+                    # 发现重复
+                    duplicates.append({
+                        'original': md5_dict[file_hash],
+                        'duplicate': file_path
+                    })
+                else:
+                    md5_dict[file_hash] = file_path
+            except Exception as e:
+                print(f"无法读取文件 {filename}: {e}")
+
+        # 删除重复文件
+        if duplicates:
+            print(f"发现 {len(duplicates)} 个重复图片，正在删除...")
+            for dup in duplicates:
+                try:
+                    os.remove(dup['duplicate'])
+                    print(f"  删除: {os.path.basename(dup['duplicate'])} (与 {os.path.basename(dup['original'])} 重复)")
+                except Exception as e:
+                    print(f"  删除失败 {os.path.basename(dup['duplicate'])}: {e}")
+            print(f"\n{'='*60}")
+            print(f"✅ 去重完成，删除了 {len(duplicates)} 个重复文件")
+            print(f"📁 {os.path.abspath(folder_path)}")
+            print(f"{'='*60}")
+        else:
+            print(f"\n{'='*60}")
+            print("✅ 未发现重复图片")
+            print(f"📁 {os.path.abspath(folder_path)}")
+            print(f"{'='*60}")
+
+    deduplicate_images(args.dedupe)
+    exit(0)
 
 if not args.query:
     print("Please provide a query like `topic_tags=foobar`!")
@@ -31,10 +94,10 @@ def cleanup_user_data(user_data_dir):
     """删除用户数据目录的函数 (with retry)"""
     if not user_data_dir or not os.path.exists(user_data_dir):
         return
-    
+
     max_retries = 3
     retry_delay = 1
-    
+
     for attempt in range(max_retries):
         try:
             # Give Chrome time to fully release file locks
@@ -51,6 +114,56 @@ def cleanup_user_data(user_data_dir):
                 # Last attempt failed, just log it
                 print(f"警告：无法删除临时用户数据目录 {user_data_dir}: {str(e)[:100]}")
                 print(f"请手动删除: {user_data_dir}")
+
+def deduplicate_images(folder_path):
+    """按 MD5 去重图片文件"""
+    if not os.path.exists(folder_path):
+        return
+
+    print(f"\n开始检查重复图片...")
+    md5_dict = {}
+    duplicates = []
+    image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'}
+
+    # 遍历目录中的所有图片文件
+    for filename in os.listdir(folder_path):
+        file_path = os.path.join(folder_path, filename)
+        if not os.path.isfile(file_path):
+            continue
+
+        # 检查是否是图片文件
+        ext = os.path.splitext(filename)[1].lower()
+        if ext not in image_extensions:
+            continue
+
+        # 计算 MD5
+        try:
+            with open(file_path, 'rb') as f:
+                file_hash = hashlib.md5(f.read()).hexdigest()
+
+            if file_hash in md5_dict:
+                # 发现重复
+                duplicates.append({
+                    'original': md5_dict[file_hash],
+                    'duplicate': file_path
+                })
+            else:
+                md5_dict[file_hash] = file_path
+        except Exception as e:
+            print(f"无法读取文件 {filename}: {e}")
+
+    # 删除重复文件
+    if duplicates:
+        print(f"发现 {len(duplicates)} 个重复图片，正在删除...")
+        for dup in duplicates:
+            try:
+                os.remove(dup['duplicate'])
+                print(f"  删除: {os.path.basename(dup['duplicate'])} (与 {os.path.basename(dup['original'])} 重复)")
+            except Exception as e:
+                print(f"  删除失败 {os.path.basename(dup['duplicate'])}: {e}")
+        print(f"去重完成，删除了 {len(duplicates)} 个重复文件")
+    else:
+        print("未发现重复图片")
 
 def human_like(page):
     """Simulate human-like behavior: mouse moves, scrolls, pauses"""
@@ -397,15 +510,33 @@ def run(playwright):
     
             for image in images_info:
                 file_ext = get_file_ext(image['src']) or 'jpg'
-                fail = download_image(image['src'], f'{save_folder}{image["name"]}.{file_ext}') 
+                # 如果使用 --info-file，name 已经是完整路径，不需要再拼接
+                if args.info_file:
+                    filename = image["name"]
+                else:
+                    filename = f'{save_folder}{image["name"]}.{file_ext}'
+                fail = download_image(image['src'], filename)
                 if fail:
                     fail_info.append(fail)
+
+                # 如果使用 --info-file，每次下载后立即更新文件（移除成功的，保留失败的）
+                if args.info_file:
+                    with open(args.info_file, 'w', encoding='utf-8') as json_file:
+                        # 计算剩余未处理的图片（当前失败的 + 还未处理的）
+                        remaining = fail_info + images_info[images_info.index(image) + 1:]
+                        json.dump(remaining, json_file, ensure_ascii=False, indent=4)
+
                 pbar.update(math.floor(75/len(images_info)) if images_info else 0)
+
+            # 保存最终的 fail_info（如果不是使用 --info-file，或者作为备份）
             with open(f"{save_folder}fail_info.json", 'w', encoding='utf-8') as json_file:
                 json.dump(fail_info, json_file, ensure_ascii=False, indent=4)
-    
+
             pbar.close()
-            
+
+            # 去重图片
+            deduplicate_images(save_folder)
+
             # 输出保存结果的目录位置
             abs_save_folder = os.path.abspath(save_folder)
             print(f"\n{'='*60}")
