@@ -48,10 +48,15 @@ def is_single_frame_gif(path):
 def download_image(url, filename):
     from .shared import proxies, save_folder
 
-    if os.path.exists(filename): 
+    if os.path.exists(filename):
         print(f"skip already exists image: {filename}")
         return None
-    os.makedirs(save_folder, exist_ok=True)
+
+    # 确保目标目录存在
+    file_dir = os.path.dirname(filename)
+    if file_dir:
+        os.makedirs(file_dir, exist_ok=True)
+
     response = requests.get(url=url, proxies=proxies)
     if response.status_code == 200:
         with open(filename, 'wb') as f:
@@ -60,10 +65,10 @@ def download_image(url, filename):
         return None
     else:
         print(f"Failed to download image: {url}")
-        return { 
-            'src': url, 
-            'name': filename, 
-            'reason': str(response.status_code) + ' ' + response.reason 
+        return {
+            'src': url,
+            'name': filename,  # 保存完整路径，以便重试时使用
+            'reason': str(response.status_code) + ' ' + response.reason
         }
 
 def get_file_ext(url):

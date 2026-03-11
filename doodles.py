@@ -541,7 +541,7 @@ def run(playwright):
                     fail_info.append(fail)
 
                 # 如果使用 --info-file，每次下载后立即更新文件（移除成功的，保留失败的）
-                if args.info_file:
+                if args.info_file and args.info_file.contains('fail_info'):
                     with open(args.info_file, 'w', encoding='utf-8') as json_file:
                         # 计算剩余未处理的图片（当前失败的 + 还未处理的）
                         remaining = fail_info + images_info[images_info.index(image) + 1:]
