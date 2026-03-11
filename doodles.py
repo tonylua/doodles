@@ -507,7 +507,21 @@ def run(playwright):
                 
                 browser.close()
                 cleanup_user_data(temp_dir)
-    
+
+            # 找出所有已存在的文件（用于断点续传）
+            existing_files = set()
+            last_existing_file = None
+            for image in images_info:
+                file_ext = get_file_ext(image['src']) or 'jpg'
+                if args.info_file:
+                    filename = image["name"]
+                else:
+                    filename = f'{save_folder}{image["name"]}.{file_ext}'
+
+                if os.path.exists(filename) and os.path.getsize(filename) > 0:
+                    existing_files.add(filename)
+                    last_existing_file = filename
+
             for image in images_info:
                 file_ext = get_file_ext(image['src']) or 'jpg'
                 # 如果使用 --info-file，name 已经是完整路径，不需要再拼接
@@ -515,6 +529,13 @@ def run(playwright):
                     filename = image["name"]
                 else:
                     filename = f'{save_folder}{image["name"]}.{file_ext}'
+
+                # 跳过已存在的文件（最后一张除外，因为可能下载不完整）
+                if filename in existing_files and filename != last_existing_file:
+                    print(f"跳过已存在: {os.path.basename(filename)}")
+                    pbar.update(math.floor(75/len(images_info)) if images_info else 0)
+                    continue
+
                 fail = download_image(image['src'], filename)
                 if fail:
                     fail_info.append(fail)
