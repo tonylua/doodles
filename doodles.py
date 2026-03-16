@@ -307,10 +307,19 @@ def run(playwright):
     
                 page.route("**/*", intercept_request)
                 page.on("response", intercept_response)
+
+                sort_combinations = [
+                    ("asc", "title"),    # sort_direction-asc__order_by-title
+                    ("desc", "title"),   # sort_direction-desc__order_by-title
+                    ("asc", "date"),     # sort_direction-asc__order_by-date
+                    ("desc", "date")     # sort_direction-desc__order_by-date
+                ]
+                selected_dir, selected_by = random.choice(sort_combinations)
+                sort_part = f"sort_tags=sort_direction-{selected_dir}__order_by-{selected_by}"
                 
                 # 直接访问搜索页面
                 try:
-                    page.goto(f"{DOODLES_URL}?{args.query}", timeout=args.timeout, wait_until='load')
+                    page.goto(f"{DOODLES_URL}?{args.query}&{sort_part}", timeout=args.timeout, wait_until='load')
                     page.wait_for_timeout(random.randint(1500, 3000))
                 except Exception as e:
                     pass
