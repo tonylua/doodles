@@ -28,9 +28,6 @@ def intercept_request(route, request):
             # 设置 Accept - 这对 API 调用很重要
             headers['accept'] = 'application/json, text/plain, */*'
             
-            # 确保 Cookie 被发送 (不要移除它们！)
-            # Playwright 应该自动处理 cookies，但我们确保不会干涉
-            
             # 设置Referer - Google会检查这个
             if not _get_header_key(headers, 'referer'):
                 headers['referer'] = 'https://doodles.google/search/'
