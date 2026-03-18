@@ -4,6 +4,7 @@ import json
 import math
 import random
 import hashlib
+from datetime import datetime
 from pathlib import Path
 from tqdm import tqdm
 from scrapling import StealthyFetcher
@@ -130,6 +131,26 @@ def deduplicate_images(folder_path):
     else:
         print("未发现重复图片")
 
+def extract_keyword_from_query(query):
+    """从查询字符串中提取 topic_tags 或 title_like 的 value 部分"""
+    if not query:
+        return None
+    
+    # 分割查询参数（可能多个参数用&连接）
+    parts = query.split('&')
+    
+    # 优先查找 topic_tags
+    for part in parts:
+        if part.startswith('topic_tags='):
+            return part.split('=', 1)[1]
+    
+    # 其次查找 title_like
+    for part in parts:
+        if part.startswith('title_like='):
+            return part.split('=', 1)[1]
+    
+    return None
+
 def run():
     images_info = []
     fail_info = []
@@ -145,15 +166,6 @@ def run():
                 fetcher = StealthyFetcher()
 
                 pbar.update(5)
-
-                sort_combinations = [
-                    ("asc", "title"),    # sort_direction-asc__order_by-title
-                    ("desc", "title"),   # sort_direction-desc__order_by-title
-                    ("asc", "date"),     # sort_direction-asc__order_by-date
-                    ("desc", "date")     # sort_direction-desc__order_by-date
-                ]
-                selected_dir, selected_by = random.choice(sort_combinations)
-                sort_part = f"sort_tags=sort_direction-{selected_dir}__order_by-{selected_by}"
 
                 def page_action(page):
                     """Callback function to interact with the page - all page operations must be here"""
@@ -292,7 +304,7 @@ def run():
                 # Navigate to search page using Scrapling with page_action
                 try:
                     response = fetcher.fetch(
-                        url=f"{DOODLES_URL}?{args.query}&{sort_part}",
+                        url=f"{DOODLES_URL}?{args.query}",
                         headless=not bool(args.open),
                         proxy=proxies['http'] if proxies else None,
                         timeout=args.timeout,
@@ -378,8 +390,45 @@ def run():
             # 去重图片
             deduplicate_images(save_folder)
 
+            # 提取关键字并重命名文件夹
+            keyword = extract_keyword_from_query(args.query)
+            if keyword:
+                timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                # 规范化路径，确保跨平台兼容性，并移除尾部分隔符
+                norm_save_folder = os.path.normpath(save_folder).rstrip(os.sep).rstrip('/')
+                parent_dir = os.path.dirname(norm_save_folder)
+                folder_name = os.path.basename(norm_save_folder)
+                
+                # 确保 parent_dir 不为空（如果是相对路径可能导致空字符串）
+                if not parent_dir:
+                    parent_dir = "."
+                
+                new_folder_name = f"{timestamp}_{keyword}"
+                new_save_folder = os.path.join(parent_dir, new_folder_name)
+                
+                # 避免重名冲突 - 使用规范化路径进行比较
+                counter = 1
+                final_new_save_folder = new_save_folder
+                norm_new_folder = os.path.normpath(final_new_save_folder)
+                while os.path.exists(final_new_save_folder) and norm_new_folder != norm_save_folder:
+                    final_new_save_folder = os.path.join(parent_dir, f"{new_folder_name}_{counter}")
+                    norm_new_folder = os.path.normpath(final_new_save_folder)
+                    counter += 1
+                
+                if norm_new_folder != norm_save_folder:
+                    try:
+                        os.rename(norm_save_folder, final_new_save_folder)
+                        abs_save_folder = os.path.abspath(final_new_save_folder)
+                        print(f"\n✅ 文件夹已重命名: {folder_name} -> {os.path.basename(final_new_save_folder)}")
+                    except Exception as e:
+                        print(f"\n⚠️  重命名失败: {e}")
+                        abs_save_folder = os.path.abspath(norm_save_folder)
+                else:
+                    abs_save_folder = os.path.abspath(norm_save_folder)
+            else:
+                abs_save_folder = os.path.abspath(save_folder)
+
             # 输出保存结果的目录位置
-            abs_save_folder = os.path.abspath(save_folder)
             print(f"\n{'='*60}")
             print(f"✅ 任务完成：{len(images_info)} 张图片，{len(fail_info)} 张失败")
             print(f"📁 {abs_save_folder}")
