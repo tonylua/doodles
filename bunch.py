@@ -3,6 +3,8 @@ import sys
 import json
 import argparse
 import subprocess
+import re
+import shutil
 from datetime import datetime
 from pathlib import Path
 
@@ -27,27 +29,107 @@ def load_topics():
 def is_already_downloaded(folder_path, topic_key):
     """
     Check if a topic has already been downloaded.
-    Looks for a folder with pattern: timestamp_{topic_key} or any subfolder that matches.
+    Looks for a folder with pattern: {timestamp}_{topic_key} where timestamp is 14 consecutive digits (YYYYMMDDHHMMSS).
     """
     if not os.path.exists(folder_path):
         return False
     
-    # Get the base folder name (e.g., 'images' from 'images/')
+    # Get the parent directory of the base folder
     parent_dir = Path(folder_path).parent
-    base_name = Path(folder_path).name
     
-    # Check for folders with pattern: {timestamp}_{topic_key}
-    pattern_prefix = f"_{topic_key}"
+    # Build regex pattern: 14 digits followed by underscore and topic_key
+    # Escape topic_key for regex
+    escaped_key = re.escape(topic_key)
+    pattern = re.compile(rf'^\d{{14}}_{escaped_key}$')
+    
     try:
         for item in parent_dir.iterdir():
-            if item.is_dir() and item.name.startswith('2') and item.name.endswith(pattern_prefix):
-                # Check if it's a valid doodle folder (contains images or images_info.json)
-                if (item / 'images_info.json').exists() or any(f.suffix in {'.jpg', '.jpeg', '.png', '.gif', '.webp'} for f in item.iterdir() if f.is_file()):
-                    return True
+            if item.is_dir():
+                # Check if name matches the pattern
+                if pattern.match(item.name):
+                    # Check if it's a valid doodle folder (contains images or images_info.json)
+                    if (item / 'images_info.json').exists() or any(f.suffix in {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'} for f in item.iterdir() if f.is_file()):
+                        return True
     except Exception:
         pass
     
     return False
+
+def cleanup_invalid_folders(images_folder, topics):
+    """
+    Delete directories that look like timestamped folders but are invalid.
+    Scans: (1) parent of images_folder for timestamped folders, and (2) images_folder itself if it exists.
+    Never deletes the 'images' folder or any valid doodle folders.
+    """
+    base_dir = Path(__file__).parent
+    deleted = 0
+    kept = 0
+    
+    # Precompile regex for valid doodle folders
+    topic_keys = list(topics.keys())
+    valid_patterns = {}
+    for key in topic_keys:
+        escaped_key = re.escape(key)
+        valid_patterns[key] = re.compile(rf'^\d{{14}}_{escaped_key}$')
+    
+    def scan_and_clean(directory, is_nested=False):
+        nonlocal deleted, kept
+        if not directory.exists():
+            return
+        
+        dir_name = directory.name
+        
+        # Check if directory name starts with 14 digits (timestamp format)
+        if re.match(r'^\d{14}', dir_name):
+            # This is a timestamped folder - check if valid
+            is_valid = False
+            for key, pattern in valid_patterns.items():
+                if pattern.match(dir_name):
+                    # Verify content
+                    if (directory / 'images_info.json').exists() or any(f.suffix in {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'} for f in directory.iterdir() if f.is_file()):
+                        is_valid = True
+                        break
+            
+            if is_valid:
+                kept += 1
+            else:
+                # Delete the invalid folder
+                try:
+                    shutil.rmtree(directory)
+                    print(f"  Deleted invalid folder: {directory}")
+                    deleted += 1
+                except Exception as e:
+                    print(f"  Failed to delete {directory}: {e}")
+            return  # Don't recurse into a timestamped folder (it's either kept or deleted)
+        
+        # If not a timestamped folder, and it's a directory, scan its contents
+        # But skip 'images' folder at top level from being deleted (we still recurse into it)
+        try:
+            for item in directory.iterdir():
+                if item.is_dir():
+                    # At top level, skip the 'images' folder itself from deletion, but still recurse into it
+                    if not is_nested and item.name == 'images':
+                        scan_and_clean(item, is_nested=True)  # Recurse into images but don't delete it
+                    else:
+                        scan_and_clean(item, is_nested=False)
+        except Exception:
+            pass
+    
+    # Determine where to start scanning
+    if images_folder.exists():
+        print(f"Cleaning up: scanning {images_folder.parent} and {images_folder}")
+        # Scan the parent directory (where renamed folders live)
+        scan_and_clean(images_folder.parent, is_nested=False)
+        # Also scan inside images folder itself (in case there are nested timestamped subfolders)
+        scan_and_clean(images_folder, is_nested=False)
+    else:
+        # If images doesn't exist, scan the project directory
+        parent_dir = base_dir
+        print(f"Images folder not found, scanning project directory: {parent_dir}")
+        scan_and_clean(parent_dir, is_nested=False)
+    
+    print(f"Cleanup: {deleted} invalid timestamped folders deleted, {kept} valid folders kept")
+    print("="*60)
 
 def main():
     args = parse_args()
@@ -66,10 +148,14 @@ def main():
     # Get the directory where bunch.py is located
     base_dir = Path(__file__).parent
     doodles_script = base_dir / 'doodles.py'
+    images_folder = base_dir / 'images'
     
     if not doodles_script.exists():
         print(f"Error: doodles.py not found at {doodles_script}")
         sys.exit(1)
+    
+    # Perform cleanup before starting batch
+    cleanup_invalid_folders(images_folder, topics)
     
     # Track statistics
     skipped = 0
@@ -84,11 +170,7 @@ def main():
         query = f"topic_tags={topic_key}"
         
         # Check if already downloaded
-        # We need to determine the potential save folder path
-        # The save folder is usually 'images/' by default (from utils/shared.py)
-        # But we can't know exactly until doodles.py runs. We'll check the common pattern.
-        potential_base_folder = base_dir / 'images'
-        if is_already_downloaded(potential_base_folder, topic_key):
+        if is_already_downloaded(images_folder, topic_key):
             print(f"  ⏭️  Skipping: Already downloaded (found existing folder with keyword '{topic_key}')")
             skipped += 1
             continue

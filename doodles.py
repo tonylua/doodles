@@ -393,7 +393,7 @@ def run():
             # 提取关键字并重命名文件夹
             keyword = extract_keyword_from_query(args.query)
             if keyword:
-                timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                timestamp = datetime.now().strftime("%Y%m%d%H%M%S")  # 14位连续数字
                 # 规范化路径，确保跨平台兼容性，并移除尾部分隔符
                 norm_save_folder = os.path.normpath(save_folder).rstrip(os.sep).rstrip('/')
                 parent_dir = os.path.dirname(norm_save_folder)
