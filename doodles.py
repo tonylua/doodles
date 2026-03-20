@@ -373,7 +373,7 @@ def run():
                     fail_info.append(fail)
 
                 # 如果使用 --info-file，每次下载后立即更新文件（移除成功的，保留失败的）
-                if args.info_file and args.info_file.contains('fail_info'):
+                if args.info_file and 'fail_info' in args.info_file:
                     with open(args.info_file, 'w', encoding='utf-8') as json_file:
                         # 计算剩余未处理的图片（当前失败的 + 还未处理的）
                         remaining = fail_info + images_info[images_info.index(image) + 1:]
@@ -390,43 +390,42 @@ def run():
             # 去重图片
             deduplicate_images(save_folder)
 
-            # 提取关键字并重命名文件夹
-            keyword = extract_keyword_from_query(args.query)
-            if keyword:
-                timestamp = datetime.now().strftime("%Y%m%d%H%M%S")  # 14位连续数字
-                # 规范化路径，确保跨平台兼容性，并移除尾部分隔符
-                norm_save_folder = os.path.normpath(save_folder).rstrip(os.sep).rstrip('/')
-                parent_dir = os.path.dirname(norm_save_folder)
-                folder_name = os.path.basename(norm_save_folder)
+            # 重命名文件夹：移除 _tmp 后缀
+            norm_save_folder = os.path.normpath(save_folder).rstrip(os.sep).rstrip('/')
+            parent_dir = os.path.dirname(norm_save_folder)
+            folder_name = os.path.basename(norm_save_folder)
+            
+            # 确保 parent_dir 不为空（如果是相对路径可能导致空字符串）
+            if not parent_dir:
+                parent_dir = "."
+            
+            # 如果文件夹名以 _tmp 结尾，移除它
+            if folder_name.endswith('_tmp'):
+                final_folder_name = folder_name[:-4]  # 移除 _tmp
+                final_save_folder = os.path.join(parent_dir, final_folder_name)
                 
-                # 确保 parent_dir 不为空（如果是相对路径可能导致空字符串）
-                if not parent_dir:
-                    parent_dir = "."
-                
-                new_folder_name = f"{timestamp}_{keyword}"
-                new_save_folder = os.path.join(parent_dir, new_folder_name)
-                
-                # 避免重名冲突 - 使用规范化路径进行比较
+                # 避免重名冲突
                 counter = 1
-                final_new_save_folder = new_save_folder
-                norm_new_folder = os.path.normpath(final_new_save_folder)
-                while os.path.exists(final_new_save_folder) and norm_new_folder != norm_save_folder:
-                    final_new_save_folder = os.path.join(parent_dir, f"{new_folder_name}_{counter}")
-                    norm_new_folder = os.path.normpath(final_new_save_folder)
+                final_path = final_save_folder
+                norm_final = os.path.normpath(final_path)
+                while os.path.exists(final_path) and norm_final != norm_save_folder:
+                    final_path = os.path.join(parent_dir, f"{final_folder_name}_{counter}")
+                    norm_final = os.path.normpath(final_path)
                     counter += 1
                 
-                if norm_new_folder != norm_save_folder:
+                if norm_final != norm_save_folder:
                     try:
-                        os.rename(norm_save_folder, final_new_save_folder)
-                        abs_save_folder = os.path.abspath(final_new_save_folder)
-                        print(f"\n✅ 文件夹已重命名: {folder_name} -> {os.path.basename(final_new_save_folder)}")
+                        os.rename(norm_save_folder, final_path)
+                        abs_save_folder = os.path.abspath(final_path)
+                        print(f"\n✅ 文件夹已重命名: {folder_name} -> {os.path.basename(final_path)}")
                     except Exception as e:
                         print(f"\n⚠️  重命名失败: {e}")
                         abs_save_folder = os.path.abspath(norm_save_folder)
                 else:
                     abs_save_folder = os.path.abspath(norm_save_folder)
             else:
-                abs_save_folder = os.path.abspath(save_folder)
+                # 没有 _tmp 后缀（可能是 --info_file 情况），直接使用
+                abs_save_folder = os.path.abspath(norm_save_folder)
 
             # 输出保存结果的目录位置
             print(f"\n{'='*60}")
@@ -437,5 +436,6 @@ def run():
         print(f"\n" + "="*60)
         print(f"❌ 出错: {e}")
         print(f"="*60)
+        raise e
 
 run()

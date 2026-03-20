@@ -117,7 +117,9 @@ def intercept_response(response):
             
             # 检查返回的数据是否真的有内容
             if not data or not data.get('doodles'):
-                print(f"⚠️ Response data is empty or malformed: {data}")
+                data_size = len(str(data)) if data else 0
+                has_doodles = bool(data.get('doodles') if data else False)
+                print(f"⚠️ Response data empty/malformed (size={data_size} chars, doodles={has_doodles})")
                 return response
             
             count = int(data.get('totalItems', 0)) 
