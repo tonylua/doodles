@@ -46,6 +46,7 @@ def is_single_frame_gif(path):
         return False
 
 def download_image(url, filename):
+    import time
     from .shared import proxies, save_folder
 
     if os.path.exists(filename):
@@ -57,19 +58,33 @@ def download_image(url, filename):
     if file_dir:
         os.makedirs(file_dir, exist_ok=True)
 
-    response = requests.get(url=url, proxies=proxies)
-    if response.status_code == 200:
-        with open(filename, 'wb') as f:
-            f.write(response.content)
-        print(f"Image downloaded: {filename}")
-        return None
-    else:
-        print(f"Failed to download image: {url}")
-        return {
-            'src': url,
-            'name': filename,  # 保存完整路径，以便重试时使用
-            'reason': str(response.status_code) + ' ' + response.reason
-        }
+    max_retries = 2
+    last_error = None
+    
+    for attempt in range(max_retries + 1):
+        try:
+            response = requests.get(url=url, proxies=proxies, timeout=10)
+            if response.status_code == 200:
+                with open(filename, 'wb') as f:
+                    f.write(response.content)
+                print(f"Image downloaded: {filename}")
+                return None
+            else:
+                last_error = f"{response.status_code} {response.reason}"
+                print(f"Attempt {attempt + 1}/{max_retries + 1} failed: {last_error}")
+        except requests.exceptions.RequestException as e:
+            last_error = str(e)
+            print(f"Attempt {attempt + 1}/{max_retries + 1} error: {last_error}")
+        
+        if attempt < max_retries:
+            time.sleep(1)
+    
+    print(f"Failed to download image after {max_retries + 1} attempts: {url}")
+    return {
+        'src': url,
+        'name': filename,
+        'reason': last_error
+    }
 
 def get_file_ext(url):
     match = re.search(r'\.([^./]+)$', url)
