@@ -18,8 +18,6 @@ groups = {
         "Day of the Dead",
         "Valentines Day",
         "Pride Month",
-        "St. David's Day",
-        "St. Patrick's Day",
         "Black History Month",
         "Asian/Pacific American Heritage Month",
         "Hispanic Heritage Month",
@@ -71,6 +69,7 @@ groups = {
         "Education"
     ],
     "Sports Events": [
+        "Sports",
         "American Football",
         "Cricket World Cup",
         "Archery",
@@ -109,10 +108,12 @@ groups = {
         "Summer Games"
     ],
     "Games": [
+        "Games",
         "Board Games",
         "Video Games"
     ],
     "Arts": [
+        "Arts",
         "Animation",
         "Architecture",
         "Ceramics",
@@ -140,9 +141,11 @@ groups = {
         "Animals",
         "Fictional Animals",
         "Insects",
+        "Natural World",
         "Plants & Flowers"
     ],
     "Geography & Landmarks": [
+        "Geography",
         "Man Made Landmarks",
         "Natural Landmarks"
     ],
@@ -164,6 +167,7 @@ groups = {
         "Physics",
         "Psychology",
         "Public Health",
+        "Science",
         "Sociology / Anthropology",
         "Space",
         "Sustainability",

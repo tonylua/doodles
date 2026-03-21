@@ -5,6 +5,9 @@ import subprocess
 import shutil
 import math
 import platform
+import json
+import argparse
+import hashlib
 from tqdm import tqdm
 from utils.file import get_gif_duration, is_single_frame_gif
 from pathlib import Path
@@ -14,6 +17,55 @@ TMP_FOLDER = "./tmp/"
 FONT_FILE = os.path.abspath("./sounso.ttf")  # Use absolute path
 MIN_DURATION = 3 
 RESOLUTION = 1280, 720
+
+def compute_md5(file_path):
+    """Compute MD5 hash of a file."""
+    hash_md5 = hashlib.md5()
+    with open(file_path, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
+
+def load_topics_aggregated():
+    """Load topics_aggregated.json file."""
+    topics_file = os.path.join(os.path.dirname(__file__), "topics_aggregated.json")
+    if os.path.exists(topics_file):
+        with open(topics_file, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return {}
+
+def flatten_topics(aggregate_name, topics_data):
+    """Flatten nested topic structure to get all topic names under an aggregate."""
+    topics_set = set()
+    
+    # Add the aggregate name itself
+    topics_set.add(aggregate_name)
+    
+    # If the aggregate exists in the data and is a dict, add all its children
+    if aggregate_name in topics_data and isinstance(topics_data[aggregate_name], dict):
+        for child_topic in topics_data[aggregate_name].keys():
+            topics_set.add(child_topic)
+    
+    return topics_set
+
+def find_matching_directories(images_dir, topics_set):
+    """Find all directories in images_dir that match any topic in topics_set."""
+    matching_dirs = []
+    
+    if not os.path.exists(images_dir):
+        return matching_dirs
+    
+    for item in os.listdir(images_dir):
+        item_path = os.path.join(images_dir, item)
+        if os.path.isdir(item_path):
+            # Extract topic name from directory name: {timestamp}_{topic}
+            match = re.match(r'^\d+_(.+)$', item)
+            if match:
+                topic_name = match.group(1)
+                if topic_name in topics_set:
+                    matching_dirs.append(item_path)
+    
+    return matching_dirs
 
 def add_text_to_image(image_path, text, output_path):
     """Add text overlay to image using PIL.
@@ -212,20 +264,29 @@ def extract_year_from_filename(filename):
     # Default: no year found
     return (0, basename)
 
-def main(directory, output_video_name):
+def main(directory, output_video_name, aggregate=None, dedupe_cache=None):
     delete_files_with_pattern(directory, "*.Zone.Identifier")
 
     if os.path.exists(TMP_FOLDER):
         shutil.rmtree(TMP_FOLDER)
+    
     image_files = glob.glob(os.path.join(directory, "*"))
     # Filter image files
     image_files = [f for f in image_files if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp'))]
+    
     # Sort by year (descending), then by filename
     image_files.sort(key=lambda x: (-extract_year_from_filename(x)[0], extract_year_from_filename(x)[1]))
     
     temp_video_files = []
     failed_files = []
     for image_file in tqdm(image_files, desc="Converting images to video"):
+        # Deduplication check
+        if dedupe_cache is not None:
+            file_hash = compute_md5(image_file)
+            if file_hash in dedupe_cache:
+                continue  # Skip duplicate
+            dedupe_cache.add(file_hash)
+        
         is_gif = image_file.lower().endswith('.gif')
         video_file = convert_image_to_video(image_file, output_video_name, is_gif)
         if video_file and os.path.exists(video_file):
@@ -246,13 +307,101 @@ def main(directory, output_video_name):
     # shutil.rmtree(TMP_FOLDER)
 
 if __name__ == "__main__":
-    import sys
-    if len(sys.argv) < 3:
-        print("Usage: python trans2video.py <directory> <output_video_name>")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description='Convert images to video')
+    parser.add_argument('output', nargs='?', help='output video name')
+    parser.add_argument('directory', nargs='?', help='directory containing images')
+    parser.add_argument('--aggregate', help='aggregate topic name from topics_aggregated.json')
     
-    directory = sys.argv[1]
-    output_video_name = sys.argv[2]
-    if platform.system() == "Windows":
-        os.environ["FONTCONFIG_PATH"] = "fonts.conf"
-    main(directory, output_video_name)
+    args = parser.parse_args()
+    
+    # Determine operating mode
+    if args.aggregate:
+        # Aggregate mode: --aggregate=<topic> <output>
+        if not args.output:
+            print("Error: output video name is required when using --aggregate")
+            sys.exit(1)
+        
+        # Load topics and find matching directories
+        topics_data = load_topics_aggregated()
+        if not topics_data:
+            print("Error: topics_aggregated.json not found or empty")
+            sys.exit(1)
+        
+        # Validate aggregate exists
+        if args.aggregate not in topics_data:
+            print(f"Error: aggregate '{args.aggregate}' not found in topics_aggregated.json")
+            print(f"Available aggregates: {', '.join(sorted(topics_data.keys()))}")
+            sys.exit(1)
+        
+        # Flatten topics to get all topic names under this aggregate
+        topics_set = flatten_topics(args.aggregate, topics_data)
+        
+        # Find matching directories in images folder
+        images_base_dir = os.path.join(os.path.dirname(__file__), "images")
+        matching_dirs = find_matching_directories(images_base_dir, topics_set)
+        
+        if not matching_dirs:
+            print(f"Error: no directories found matching topics in aggregate '{args.aggregate}'")
+            sys.exit(1)
+        
+        print(f"Aggregate mode: '{args.aggregate}' includes topics: {', '.join(sorted(topics_set))}")
+        print(f"Found {len(matching_dirs)} directories to process")
+        
+        # Use the first matching directory as the processing directory
+        # But we'll collect images from all matching directories
+        all_image_files = []
+        for dir_path in matching_dirs:
+            images = glob.glob(os.path.join(dir_path, "*"))
+            images = [f for f in images if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp'))]
+            all_image_files.extend(images)
+        
+        # Sort by year (descending), then by filename
+        all_image_files.sort(key=lambda x: (-extract_year_from_filename(x)[0], extract_year_from_filename(x)[1]))
+        
+        # Create a temporary directory with symlinks/copies? No, we'll modify main to accept a list
+        # Actually, let's just create a wrapper that processes the collected files directly
+        
+        # We'll modify the flow: instead of using main's directory scanning, we'll process directly here
+        if os.path.exists(TMP_FOLDER):
+            shutil.rmtree(TMP_FOLDER)
+        os.makedirs(TMP_FOLDER, exist_ok=True)
+        
+        dedupe_cache = set()
+        temp_video_files = []
+        failed_files = []
+        
+        print(f"Processing {len(all_image_files)} images from {len(matching_dirs)} directories...")
+        for image_file in tqdm(all_image_files, desc="Converting images to video"):
+            # Deduplication
+            file_hash = compute_md5(image_file)
+            if file_hash in dedupe_cache:
+                continue
+            dedupe_cache.add(file_hash)
+            
+            is_gif = image_file.lower().endswith('.gif')
+            video_file = convert_image_to_video(image_file, args.output, is_gif)
+            if video_file and os.path.exists(video_file):
+                temp_video_files.append(video_file)
+            else:
+                failed_files.append(os.path.basename(image_file))
+        
+        print(f"\nConversion complete: {len(temp_video_files)}/{len(all_image_files)} videos generated")
+        if failed_files:
+            print(f"Conversion failed: {len(failed_files)} files")
+            for fname in failed_files[:5]:
+                print(f"   - {fname}")
+            if len(failed_files) > 5:
+                print(f"   ... and {len(failed_files) - 5} more files")
+        print(f"Merging videos...")
+        merge_videos(temp_video_files, args.output)
+        print(f"Video saved to: {os.path.abspath(args.output)}")
+        
+    elif args.directory and args.output:
+        # Original mode: python trans2video.py <directory> <output>
+        if platform.system() == "Windows":
+            os.environ["FONTCONFIG_PATH"] = "fonts.conf"
+        dedupe_cache = set()
+        main(args.directory, args.output, dedupe_cache=dedupe_cache)
+    else:
+        parser.print_help()
+        sys.exit(1)

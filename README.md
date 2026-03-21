@@ -61,6 +61,8 @@ This will scan all images in the specified directory, calculate MD5 hashes, and 
 
 ### run
 
+#### Single directory mode
+
 ```
 python .\trans2video.py [images_dir] [output_video_name]
 ```
@@ -70,3 +72,15 @@ python .\trans2video.py [images_dir] [output_video_name]
 ```
 python .\trans2video.py .\images\20250511160708\ "LaborDay.mp4"
 ```
+
+#### Aggregate mode
+
+Combine multiple topic directories into a single video using `--aggregate`:
+
+```
+python .\trans2video.py --aggregate="Games" Output.mp4
+```
+
+This will collect all images from directories matching the aggregate topic and its subtopics (e.g., "Games", "Board Games", "Video Games") in the `images/` folder, deduplicate them by MD5 hash, and create a single video.
+
+Available aggregates can be found in `topics_aggregated.json`.

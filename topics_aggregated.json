@@ -64,6 +64,7 @@
     "Education": "教育"
   },
   "Sports Events": {
+    "Sports": "体育",
     "American Football": "美式橄榄球",
     "Cricket World Cup": "板球世界杯",
     "Archery": "射箭",
@@ -102,10 +103,12 @@
     "Summer Games": "夏季运动会"
   },
   "Games": {
+    "Games": "游戏",
     "Board Games": "桌面游戏",
     "Video Games": "电子游戏"
   },
   "Arts": {
+    "Arts": "艺术",
     "Animation": "动画",
     "Architecture": "建筑学",
     "Ceramics": "陶瓷工艺",
@@ -133,9 +136,11 @@
     "Animals": "动物",
     "Fictional Animals": "虚构动物",
     "Insects": "昆虫",
+    "Natural World": "自然世界",
     "Plants & Flowers": "植物与花卉"
   },
   "Geography & Landmarks": {
+    "Geography": "地理",
     "Man Made Landmarks": "人造地标",
     "Natural Landmarks": "自然地标"
   },
@@ -157,6 +162,7 @@
     "Physics": "物理学",
     "Psychology": "心理学",
     "Public Health": "公共卫生",
+    "Science": "科学",
     "Sociology / Anthropology": "社会学 / 人类学",
     "Space": "太空",
     "Sustainability": "可持续发展",
