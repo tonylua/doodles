@@ -269,6 +269,7 @@ def main(directory, output_video_name, aggregate=None, dedupe_cache=None):
 
     if os.path.exists(TMP_FOLDER):
         shutil.rmtree(TMP_FOLDER)
+    os.makedirs(TMP_FOLDER, exist_ok=True)
     
     image_files = glob.glob(os.path.join(directory, "*"))
     # Filter image files
@@ -398,10 +399,11 @@ if __name__ == "__main__":
         
     elif args.directory and args.output:
         # Original mode: python trans2video.py <directory> <output>
+        # Note: argparse order is (output, directory), so we need to swap
         if platform.system() == "Windows":
             os.environ["FONTCONFIG_PATH"] = "fonts.conf"
         dedupe_cache = set()
-        main(args.directory, args.output, dedupe_cache=dedupe_cache)
+        main(args.output, args.directory, dedupe_cache=dedupe_cache)
     else:
         parser.print_help()
         sys.exit(1)
