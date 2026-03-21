@@ -1,0 +1,177 @@
+{
+  "Family Days": {
+    "Father's Day": "父亲节",
+    "Mother's Day": "母亲节",
+    "Parent's Day": "父母节",
+    "Grandparents' Day": "祖父母节"
+  },
+  "Western festivals": {
+    "Thanksgiving": "感恩节",
+    "Halloween": "万圣节",
+    "Day of the Dead": "亡灵节",
+    "Valentines Day": "情人节",
+    "Pride Month": "骄傲月（LGBTQ+）",
+    "St. David's Day": "圣大卫日（威尔士）",
+    "St. Patrick's Day": "圣帕特里克节",
+    "Black History Month": "黑人历史月",
+    "Asian/Pacific American Heritage Month": "亚太裔美国人传统月",
+    "Hispanic Heritage Month": "西班牙裔传统月",
+    "Native American Heritage Month": "美国原住民传统月"
+  },
+  "East Asian Festivals": {
+    "Dragon Boat Festival": "端午节",
+    "Mid Autumn Festival": "中秋节",
+    "Lantern Festival": "元宵节",
+    "Qixi": "七夕",
+    "Tanabata": "七夕（日本）",
+    "Hinamatsuri": "女儿节（日本雏祭）",
+    "Hangul Day": "韩文日",
+    "Mountain Day": "山之日（日本）",
+    "Respect for the Aged Day": "敬老日",
+    "Chuseok": "秋夕（韩国中秋节）"
+  },
+  "Google Doodle Events": {
+    "Doodle For Google": "Google 涂鸦",
+    "Google's Birthday": "谷歌生日",
+    "New Google Logo": "谷歌新标志"
+  },
+  "New Year Celebrations": {
+    "New Year's Day": "元旦",
+    "New Year's Eve": "新年前夜",
+    "Lunar New Year": "农历新年",
+    "Nowruz": "诺鲁孜节（波斯新年）"
+  },
+  "World Cup Events": {
+    "World Cup": "世界杯",
+    "Women's World Cup": "女足世界杯"
+  },
+  "Multi-sport Events": {
+    "Olympics": "奥运会",
+    "Paralympics": "残奥会",
+    "Summer Games": "夏季运动会"
+  },
+  "Remembrance Days": {
+    "Memorial Day": "阵亡将士纪念日",
+    "Veterans Day": "退伍军人节",
+    "Juneteenth": "六月节（美国黑奴解放日）",
+    "Indigenous People's Day": "原住民日",
+    "Martin Luther King Jr. Day": "马丁・路德・金日"
+  },
+  "Children & Education": {
+    "Children's Day": "儿童节",
+    "First Day of School": "开学第一天",
+    "Teacher's Day": "教师节",
+    "Education": "教育"
+  },
+  "Sports Events": {
+    "American Football": "美式橄榄球",
+    "Cricket World Cup": "板球世界杯",
+    "Archery": "射箭",
+    "Badmington": "羽毛球",
+    "Baseball": "棒球",
+    "Basketball": "篮球",
+    "Billiards": "台球",
+    "Boules": "地掷球",
+    "Bowling": "保龄球",
+    "Cricket": "板球",
+    "Cycling": "自行车运动",
+    "Equine": "马术",
+    "Football/Soccer": "足球",
+    "Golf": "高尔夫",
+    "Gymnastics": "体操",
+    "Hockey": "曲棍球 / 冰球",
+    "Ice Skating": "滑冰",
+    "Lacrosse": "长曲棍球",
+    "Martial Arts": "武术",
+    "Mountaineering": "登山",
+    "Rock Climbing": "攀岩",
+    "Rugby": "橄榄球",
+    "Skateboarding": "滑板",
+    "Skiing": "滑雪",
+    "Stickball": "棍球",
+    "Surfing": "冲浪",
+    "Swimming": "游泳",
+    "Table Tennis": "乒乓球",
+    "Tennis": "网球",
+    "Track and Field": "田径",
+    "Volleyball": "排球",
+    "Water Sports": "水上运动",
+    "Weight Lifting": "举重",
+    "Winter Sports": "冬季运动",
+    "Wrestling": "摔跤",
+    "Summer Games": "夏季运动会"
+  },
+  "Games": {
+    "Board Games": "桌面游戏",
+    "Video Games": "电子游戏"
+  },
+  "Arts": {
+    "Animation": "动画",
+    "Architecture": "建筑学",
+    "Ceramics": "陶瓷工艺",
+    "Cinema": "电影",
+    "Comedy": "喜剧",
+    "Dance": "舞蹈",
+    "Design": "设计",
+    "Fashion": "时尚",
+    "Glasswork": "玻璃工艺",
+    "Illustration": "插画",
+    "Literature": "文学",
+    "Music": "音乐",
+    "Painting": "绘画",
+    "Photography": "摄影",
+    "Poetry": "诗歌",
+    "Printmaking": "版画制作",
+    "Radio": "广播",
+    "Sculpture": "雕塑",
+    "Television/Film": "电视 / 电影",
+    "Textiles": "纺织品",
+    "Theater": "戏剧",
+    "Reoccuring Doodle Characters": "重复出现的涂鸦角色"
+  },
+  "Natural World & Animals": {
+    "Animals": "动物",
+    "Fictional Animals": "虚构动物",
+    "Insects": "昆虫",
+    "Plants & Flowers": "植物与花卉"
+  },
+  "Geography & Landmarks": {
+    "Man Made Landmarks": "人造地标",
+    "Natural Landmarks": "自然地标"
+  },
+  "Transportation & Aviation": {
+    "Transportation": "交通",
+    "Aviation": "航空"
+  },
+  "Science & Technology": {
+    "AI": "人工智能",
+    "Archaeology": "考古学",
+    "Biology": "生物学",
+    "Cartography": "制图学",
+    "Chemistry": "化学",
+    "Computer Science": "计算机科学",
+    "Earth Science": "地球科学",
+    "Engineering": "工程学",
+    "Mathematics": "数学",
+    "Ocean Science": "海洋科学",
+    "Physics": "物理学",
+    "Psychology": "心理学",
+    "Public Health": "公共卫生",
+    "Sociology / Anthropology": "社会学 / 人类学",
+    "Space": "太空",
+    "Sustainability": "可持续发展",
+    "Telecommunications": "电信"
+  },
+  "Philosophy": "哲学",
+  "Elections": "选举",
+  "Food and Drink": "饮食",
+  "Journalism": "新闻业",
+  "Social Movements": "社会运动",
+  "Earth Day": "地球日",
+  "Holiday Season": "节日季",
+  "International Women's Day": "国际妇女节",
+  "Labor Day": "劳动节",
+  "Leap Day": "闰日",
+  "National Days/Independence Days": "国庆 / 独立日",
+  "Seasons": "季节"
+}

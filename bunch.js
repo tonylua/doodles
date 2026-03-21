@@ -34,7 +34,7 @@ function isAlreadyDownloaded(imagesFolder, topicKey) {
       const hasImages = fs.readdirSync(dirPath).some(file =>
         ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'].includes(path.extname(file).toLowerCase())
       );
-      if (hasImagesInfo || hasImages) {
+      if (hasImagesInfo && hasImages) {
         return true;
       }
     }
@@ -71,7 +71,7 @@ function cleanupInvalidFolders(imagesFolder) {
         const hasImages = fs.readdirSync(dirPath).some(file =>
           ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'].includes(path.extname(file).toLowerCase())
         );
-        if (hasImagesInfo || hasImages) {
+        if (hasImagesInfo && hasImages) {
           isValid = true;
           break;
         }
