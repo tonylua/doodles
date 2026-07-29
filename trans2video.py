@@ -1,5 +1,6 @@
 import os
 import re
+import sys
 import glob
 import subprocess
 import shutil
@@ -73,20 +74,22 @@ def add_text_to_image(image_path, text, output_path):
     Text is added AFTER scaling to final resolution."""
     try:
         img = Image.open(image_path)
-        # Convert to RGB if needed
+        # 先转 RGBA 再处理：调色板图（P 模式）带透明度时直接 convert('RGB')
+        # 会触发 PIL 的 "Palette images with Transparency..." 警告
         if img.mode != 'RGB':
-            img = img.convert('RGB')
-        
+            img = img.convert('RGBA')
+
         w, h = RESOLUTION  # 1280x720
-        
+
         # First: scale and pad to final resolution
         img.thumbnail((w, h), Image.Resampling.LANCZOS)
         # Create white background at final resolution
         final_img = Image.new('RGB', (w, h), 'white')
-        # Paste scaled image centered
+        # Paste scaled image centered（用 alpha 作蒙版，透明区域变白）
         x = (w - img.width) // 2
         y = (h - img.height) // 2
-        final_img.paste(img, (x, y))
+        mask = img.split()[3] if img.mode == 'RGBA' else None
+        final_img.paste(img, (x, y), mask)
         
         # Now add text to the final-resolution image
         draw = ImageDraw.Draw(final_img)
@@ -126,13 +129,14 @@ def add_text_to_image(image_path, text, output_path):
         # If text overlay fails, just copy original and scale it
         img = Image.open(image_path)
         if img.mode != 'RGB':
-            img = img.convert('RGB')
+            img = img.convert('RGBA')
         w, h = RESOLUTION
         img.thumbnail((w, h), Image.Resampling.LANCZOS)
         final_img = Image.new('RGB', (w, h), 'white')
         x = (w - img.width) // 2
         y = (h - img.height) // 2
-        final_img.paste(img, (x, y))
+        mask = img.split()[3] if img.mode == 'RGBA' else None
+        final_img.paste(img, (x, y), mask)
         final_img.save(output_path)
         return output_path
 
@@ -188,10 +192,16 @@ def convert_image_to_video(image_path, output_video_name, is_gif):
         
         # Escape text for drawtext filter (only basic escaping needed)
         escaped_text = base_name.replace("'", "'\\''")
-        
+
+        # 显式指定 fontfile，绕开 fontconfig：
+        # Windows 上 drawtext 默认走 fontconfig 找字体，找不到配置文件会报
+        # "Fontconfig error: Cannot load default config file" 导致 GIF 转换失败。
+        # 路径要转成正斜杠并转义盘符冒号（C\:/...）以符合 filter 语法。
+        font_arg = FONT_FILE.replace('\\', '/').replace(':', '\\:')
+
         # Add drawtext to final scaled video for GIFs
         drawtext = (
-            f"drawtext=text='{escaped_text}':fontsize=20:fontcolor=white:"
+            f"drawtext=fontfile='{font_arg}':text='{escaped_text}':fontsize=20:fontcolor=white:"
             f"shadowcolor=black:shadowx=2:shadowy=2:"
             f"x=(w-text_w)/2:y=h-text_h-15"
         )
@@ -208,7 +218,10 @@ def convert_image_to_video(image_path, output_video_name, is_gif):
         )
     
     # Run FFmpeg and check return code
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+    # 显式用 UTF-8 解码 FFmpeg 输出：默认会用系统区域编码（中文 Windows 为 GBK），
+    # 而 FFmpeg 日志里含非 GBK 字节（如 doodle 标题里的 é/ñ），会触发 UnicodeDecodeError
+    result = subprocess.run(cmd, shell=True, capture_output=True, text=True,
+                            encoding='utf-8', errors='replace')
     
     # Return temp_video_name only if:
     # 1. FFmpeg succeeded (return code 0)
@@ -216,6 +229,9 @@ def convert_image_to_video(image_path, output_video_name, is_gif):
     if result.returncode == 0 and os.path.exists(temp_video_name) and os.path.getsize(temp_video_name) > 50000:
         return temp_video_name
     else:
+        # 记录失败原因（FFmpeg 的 stderr 尾部），供上层汇总时查看
+        err_tail = (result.stderr or '').strip().splitlines()[-3:]
+        convert_image_to_video.last_error = ' | '.join(err_tail) if err_tail else f"returncode={result.returncode}"
         # Clean up failed file if it exists
         if os.path.exists(temp_video_name):
             try:
@@ -265,16 +281,27 @@ def extract_year_from_filename(filename):
     return (0, basename)
 
 def main(directory, output_video_name, aggregate=None, dedupe_cache=None):
+    # 规范化目录路径：去掉首尾引号和结尾的斜杠/反斜杠
+    # （PowerShell 的目录补全会在末尾加反斜杠，配合引号会破坏参数解析）
+    directory = directory.strip().strip('"').rstrip('\\/')
+    if not os.path.isdir(directory):
+        print(f"错误：目录不存在: {directory}")
+        sys.exit(1)
+
     delete_files_with_pattern(directory, "*.Zone.Identifier")
 
     if os.path.exists(TMP_FOLDER):
         shutil.rmtree(TMP_FOLDER)
     os.makedirs(TMP_FOLDER, exist_ok=True)
-    
+
     image_files = glob.glob(os.path.join(directory, "*"))
     # Filter image files
     image_files = [f for f in image_files if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp'))]
-    
+
+    if not image_files:
+        print(f"错误：目录中没有找到图片: {directory}")
+        sys.exit(1)
+
     # Sort by year (descending), then by filename
     image_files.sort(key=lambda x: (-extract_year_from_filename(x)[0], extract_year_from_filename(x)[1]))
     
@@ -293,13 +320,14 @@ def main(directory, output_video_name, aggregate=None, dedupe_cache=None):
         if video_file and os.path.exists(video_file):
             temp_video_files.append(video_file)
         else:
-            failed_files.append(os.path.basename(image_file))
-    
+            reason = getattr(convert_image_to_video, 'last_error', '')
+            failed_files.append((os.path.basename(image_file), reason))
+
     print(f"\nConversion complete: {len(temp_video_files)}/{len(image_files)} videos generated")
     if failed_files:
         print(f"Conversion failed: {len(failed_files)} files")
-        for fname in failed_files[:5]:
-            print(f"   - {fname}")
+        for fname, reason in failed_files[:5]:
+            print(f"   - {fname}  =>  {reason}")
         if len(failed_files) > 5:
             print(f"   ... and {len(failed_files) - 5} more files")
     print(f"Merging videos...")
@@ -384,13 +412,14 @@ if __name__ == "__main__":
             if video_file and os.path.exists(video_file):
                 temp_video_files.append(video_file)
             else:
-                failed_files.append(os.path.basename(image_file))
-        
+                reason = getattr(convert_image_to_video, 'last_error', '')
+                failed_files.append((os.path.basename(image_file), reason))
+
         print(f"\nConversion complete: {len(temp_video_files)}/{len(all_image_files)} videos generated")
         if failed_files:
             print(f"Conversion failed: {len(failed_files)} files")
-            for fname in failed_files[:5]:
-                print(f"   - {fname}")
+            for fname, reason in failed_files[:5]:
+                print(f"   - {fname}  =>  {reason}")
             if len(failed_files) > 5:
                 print(f"   ... and {len(failed_files) - 5} more files")
         print(f"Merging videos...")

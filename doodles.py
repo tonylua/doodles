@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from tqdm import tqdm
 from scrapling import StealthyFetcher
-from utils.shared import args, proxies, save_folder, page_size
+from utils.shared import args, proxies, save_folder, page_size, finalize_folder
 from utils.file import sanitize_filename, get_file_ext, download_image
 from utils.interceptor import intercept_request, intercept_response, TotalCounter
 
@@ -74,7 +74,7 @@ if args.dedupe:
     deduplicate_images(args.dedupe)
     exit(0)
 
-if not args.query:
+if not args.query and not args.retry:
     print("Please provide a query like `topic_tags=foobar`!")
     exit(1)
 
@@ -131,6 +131,60 @@ def deduplicate_images(folder_path):
     else:
         print("未发现重复图片")
 
+# 如果指定了 --retry 参数，只对已完成的文件夹重新下载缺失/不完整的图片
+if args.retry:
+    folder = args.retry
+    if not os.path.isdir(folder):
+        print(f"错误：目录不存在: {folder}")
+        exit(1)
+
+    info_path = os.path.join(folder, 'images_info.json')
+    if not os.path.exists(info_path):
+        print(f"错误：找不到 images_info.json: {info_path}")
+        exit(1)
+
+    with open(info_path, 'r', encoding='utf-8') as json_file:
+        images_info = json.load(json_file)
+
+    print(f"开始重新下载缺失/不完整的图片: {os.path.abspath(folder)}")
+    print(f"共 {len(images_info)} 条记录")
+
+    fail_info = []
+    downloaded = 0
+    skipped = 0
+
+    for image in images_info:
+        file_ext = get_file_ext(image['src']) or 'jpg'
+        filename = os.path.join(folder, f'{image["name"]}.{file_ext}')
+
+        if os.path.exists(filename) and os.path.getsize(filename) > 0:
+            skipped += 1
+            continue
+
+        fail = download_image(image['src'], filename)
+        if fail:
+            fail_info.append(fail)
+        else:
+            downloaded += 1
+
+    # 重新写入 fail_info.json（覆盖旧的）
+    with open(os.path.join(folder, 'fail_info.json'), 'w', encoding='utf-8') as json_file:
+        json.dump(fail_info, json_file, ensure_ascii=False, indent=4)
+
+    # 去重
+    deduplicate_images(folder)
+
+    # 如果没有失败，且文件夹还带 _tmp 后缀，则确定重命名（去掉 _tmp、URL 解码）
+    final_folder = os.path.abspath(folder)
+    if not fail_info:
+        final_folder = finalize_folder(folder)
+
+    print(f"\n{'='*60}")
+    print(f"✅ 重试完成：新下载 {downloaded} 张，已存在跳过 {skipped} 张，失败 {len(fail_info)} 张")
+    print(f"📁 {final_folder}")
+    print(f"{'='*60}")
+    exit(0)
+
 def extract_keyword_from_query(query):
     """从查询字符串中提取 topic_tags 或 title_like 的 value 部分"""
     if not query:
@@ -169,8 +223,11 @@ def run():
 
                 def page_action(page):
                     """Callback function to interact with the page - all page operations must be here"""
-                    # Set up request/response interception on the page
-                    page.route("**/*", intercept_request)
+                    # 只在需要翻页改写 URL 时才注册请求拦截。
+                    # 注册 catch-all route 会关闭浏览器 HTTP 缓存并改变请求管线，
+                    # 无必要时不注册，保持指纹最干净。
+                    if args.page_start:
+                        page.route("**/*", intercept_request)
                     page.on("response", intercept_response)
 
                     page.wait_for_timeout(random.randint(1500, 3000))
@@ -390,42 +447,8 @@ def run():
             # 去重图片
             deduplicate_images(save_folder)
 
-            # 重命名文件夹：移除 _tmp 后缀
-            norm_save_folder = os.path.normpath(save_folder).rstrip(os.sep).rstrip('/')
-            parent_dir = os.path.dirname(norm_save_folder)
-            folder_name = os.path.basename(norm_save_folder)
-            
-            # 确保 parent_dir 不为空（如果是相对路径可能导致空字符串）
-            if not parent_dir:
-                parent_dir = "."
-            
-            # 如果文件夹名以 _tmp 结尾，移除它
-            if folder_name.endswith('_tmp'):
-                final_folder_name = folder_name[:-4]  # 移除 _tmp
-                final_save_folder = os.path.join(parent_dir, final_folder_name)
-                
-                # 避免重名冲突
-                counter = 1
-                final_path = final_save_folder
-                norm_final = os.path.normpath(final_path)
-                while os.path.exists(final_path) and norm_final != norm_save_folder:
-                    final_path = os.path.join(parent_dir, f"{final_folder_name}_{counter}")
-                    norm_final = os.path.normpath(final_path)
-                    counter += 1
-                
-                if norm_final != norm_save_folder:
-                    try:
-                        os.rename(norm_save_folder, final_path)
-                        abs_save_folder = os.path.abspath(final_path)
-                        print(f"\n✅ 文件夹已重命名: {folder_name} -> {os.path.basename(final_path)}")
-                    except Exception as e:
-                        print(f"\n⚠️  重命名失败: {e}")
-                        abs_save_folder = os.path.abspath(norm_save_folder)
-                else:
-                    abs_save_folder = os.path.abspath(norm_save_folder)
-            else:
-                # 没有 _tmp 后缀（可能是 --info_file 情况），直接使用
-                abs_save_folder = os.path.abspath(norm_save_folder)
+            # 重命名文件夹：移除 _tmp 后缀（并 URL 解码）
+            abs_save_folder = finalize_folder(save_folder)
 
             # 输出保存结果的目录位置
             print(f"\n{'='*60}")

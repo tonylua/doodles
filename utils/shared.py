@@ -3,6 +3,7 @@ import re
 import argparse
 import shutil
 from datetime import datetime
+from urllib.parse import unquote
 import time
 
 arg_parser = argparse.ArgumentParser()
@@ -17,6 +18,9 @@ arg_parser.add_argument('--limit', type=int, help='total limit', default=999)
 arg_parser.add_argument('--page_start', type=int, help='start page')
 arg_parser.add_argument('--info_file', type=str, help='direct download from json file, skip browser')
 arg_parser.add_argument('--dedupe', type=str, help='deduplicate images in specified directory by MD5 hash')
+arg_parser.add_argument('--retry', type=str, help='re-download missing/incomplete images in a finished folder using its images_info.json')
+arg_parser.add_argument('--download_timeout', type=int, help='per-request download timeout in seconds', default=10)
+arg_parser.add_argument('--download_retries', type=int, help='number of extra download attempts after the first', default=2)
 
 args = arg_parser.parse_args()
 
@@ -70,9 +74,46 @@ def get_save_folder(query, base_dir=None):
         # 无法提取关键字，使用纯时间戳（带 _tmp）
         return f"{base}/{formatted_now}_tmp/"
     
-    # 规范化关键字为合法的文件夹名
-    safe_keyword = sanitize_filename(keyword)
+    # URL 解码（把 %20 之类还原成空格），再规范化为合法的文件夹名
+    safe_keyword = sanitize_filename(unquote(keyword))
     return f"{base}/{formatted_now}_{safe_keyword}_tmp/"
+
+
+def finalize_folder(save_folder):
+    """把下载完成的文件夹从 ..._tmp 重命名为最终名（去掉 _tmp、URL 解码）。
+
+    返回最终文件夹的绝对路径。若无需重命名或重命名失败，返回原文件夹的绝对路径。
+    """
+    norm_save_folder = os.path.normpath(save_folder).rstrip(os.sep).rstrip('/')
+    parent_dir = os.path.dirname(norm_save_folder) or "."
+    folder_name = os.path.basename(norm_save_folder)
+
+    if not folder_name.endswith('_tmp'):
+        return os.path.abspath(norm_save_folder)
+
+    # 去掉 _tmp 并对整名做 URL 解码（历史遗留的 %20 也一并还原）
+    final_folder_name = sanitize_filename(unquote(folder_name[:-4]))
+    final_save_folder = os.path.join(parent_dir, final_folder_name)
+
+    # 避免重名冲突
+    counter = 1
+    final_path = final_save_folder
+    norm_final = os.path.normpath(final_path)
+    while os.path.exists(final_path) and norm_final != norm_save_folder:
+        final_path = os.path.join(parent_dir, f"{final_folder_name}_{counter}")
+        norm_final = os.path.normpath(final_path)
+        counter += 1
+
+    if norm_final == norm_save_folder:
+        return os.path.abspath(norm_save_folder)
+
+    try:
+        os.rename(norm_save_folder, final_path)
+        print(f"\n✅ 文件夹已重命名: {folder_name} -> {os.path.basename(final_path)}")
+        return os.path.abspath(final_path)
+    except Exception as e:
+        print(f"\n⚠️  重命名失败: {e}")
+        return os.path.abspath(norm_save_folder)
 
 
 def cleanup_tmp_folders(base_dir=None):

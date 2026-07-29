@@ -47,9 +47,9 @@ def is_single_frame_gif(path):
 
 def download_image(url, filename):
     import time
-    from .shared import proxies, save_folder
+    from .shared import proxies, save_folder, args
 
-    if os.path.exists(filename):
+    if os.path.exists(filename) and os.path.getsize(filename) > 0:
         print(f"skip already exists image: {filename}")
         return None
 
@@ -58,12 +58,13 @@ def download_image(url, filename):
     if file_dir:
         os.makedirs(file_dir, exist_ok=True)
 
-    max_retries = 2
+    max_retries = args.download_retries
+    timeout = args.download_timeout
     last_error = None
-    
+
     for attempt in range(max_retries + 1):
         try:
-            response = requests.get(url=url, proxies=proxies, timeout=10)
+            response = requests.get(url=url, proxies=proxies, timeout=timeout)
             if response.status_code == 200:
                 with open(filename, 'wb') as f:
                     f.write(response.content)
